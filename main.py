@@ -40,6 +40,7 @@ def main():
     icon_tk = ImageTk.PhotoImage(icon_img)
     root.iconphoto(True, icon_tk)
 
+
     # ------------------- STILE -------------------
     style = ttk.Style()
     style.theme_use("clam")
