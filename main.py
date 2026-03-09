@@ -7,7 +7,7 @@ import os
 from utils.backup_db import backup_database, ripristina_backup
 from db.database import init_db, ensure_special_records
 
-
+# prova
 
 from gui.magazzino_gui import TabMagazzino
 from gui.progetti_gui import TabProgetti
