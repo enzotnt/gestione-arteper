@@ -1,10 +1,3 @@
-
-
-
-
-# ---------------
-
-
 import tkinter as tk
 from tkinter import ttk
 
@@ -20,7 +13,7 @@ from gui.magazzino_gui import TabMagazzino
 from gui.progetti_gui import TabProgetti
 from gui.venduti_gui import TabVenduti
 from gui.negozio_gui import TabNegozio
-from gui.mercatini_gui import TabMercatini  # Aggiungi questa linea
+from gui.mercatini_gui import TabMercatini
 from gui.ordini_gui import TabOrdini
 from gui.lavorazione_gui import TabLavorazione
 from gui.spese_gui import TabSpese
