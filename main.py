@@ -1,12 +1,12 @@
 import tkinter as tk
 from tkinter import ttk
-from db.database import init_db
+
 from datetime import datetime
 from PIL import Image, ImageTk
 import os
 from utils.backup_db import backup_database, ripristina_backup
 from db.database import init_db, ensure_special_records
-from gui.config_dialog import ConfigDialog
+
 
 
 from gui.magazzino_gui import TabMagazzino
