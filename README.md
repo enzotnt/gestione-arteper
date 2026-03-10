@@ -2,7 +2,7 @@
 
 ## Introduzione
 
-Benvenuto nel gestionale **arTEper**, un'applicazione progettata per gestire tutti gli aspetti della tua attività artigianale: dalla creazione di progetti alla vendita, passando per la gestione del magazzino, degli ordini e delle finanze.
+Benvenuto nel gestionale **arTEper**, un'applicazione progettata per gestire tutti gli aspetti della tua attività artigianale: dalla creazione di progetti alla vendita, passando per la gestione del magazzino, degli ordini e delle finanze. -(TESTATO SU UBUNTU 25.xx)
 
 Questo manuale ti guiderà all'utilizzo di tutte le funzionalità del programma.
 
