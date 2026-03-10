@@ -2,6 +2,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+from db.database import get_connection
 
 from logic.lavorazione import LavorazioneManager, VenditaOrdineManager
 from utils.helpers import (
@@ -468,7 +469,7 @@ class DettaglioOrdineWindow(tk.Toplevel):
         self._processa_vendita_ordine(risultato)
 
     def _processa_vendita_ordine(self, risultato):
-        """Processa la vendita dell'ordine."""
+        """Processa la vendita dell'ordine direttamente in Venduti senza passare da negozio."""
         print("\n" + "=" * 60)
         print("🔍 DEBUG VENDITA ORDINE")
         print("=" * 60)
@@ -480,69 +481,58 @@ class DettaglioOrdineWindow(tk.Toplevel):
             sconto_da_applicare = 0
             vendita_ids_per_buono = []
 
+            from logic.venduti import VendutiManager
+
+            # Calcola proporzione per eventuale sconto globale
+            totale_vendita = sum(item["prezzo_totale"] for item in risultato["items"])
+            totale_finale = risultato.get("totale_finale", totale_vendita)
+            proporzione = (totale_finale / totale_vendita) if totale_vendita else 1.0
+
+            vendita_ids = []
+
+            for i, item in enumerate(risultato["items"]):
+                prezzo_totale_scontato = round(item["prezzo_totale"] * proporzione, 2)
+                prezzo_unitario_scontato = round(item["prezzo_unitario"] * proporzione, 4)
+
+                codice_sconto = risultato.get("buono_applicato", {}).get("codice") if risultato.get(
+                    "buono_applicato") else None
+
+                # 🔥 Inserimento diretto in Venduti
+                vendita_id = VendutiManager.registra_vendita(
+                    progetto_id=item["progetto_id"],
+                    cliente=risultato["cliente"],
+                    quantita=item["quantita"],
+                    prezzo_totale=prezzo_totale_scontato,
+                    prezzo_unitario=prezzo_unitario_scontato,
+                    note=f"Da ordine #{risultato['ordine_id']}",
+                    nome_progetto=item["nome_visibile"],
+                    immagine_percorso=item.get("immagine_percorso")
+                )
+
+                if vendita_id:
+                    vendita_ids.append(vendita_id)
+
+                print(
+                    f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id}, prezzo scontato: €{prezzo_totale_scontato:.2f})"
+                )
+
+            # Segna l'ordine come consegnato
             with db_cursor(commit=True) as cur:
-                # 🔥 Verifica che i record speciali esistano
-                from db.database import ensure_special_records
-                negozio_id = ensure_special_records()
-                print(f"📌 Usando negozio_id: {negozio_id}")
-
-                # Inserisci le vendite
-                vendita_ids = []
-
-                # Calcola proporzione per scontare i prezzi (come nel negozio)
-                totale_vendita = sum(item["prezzo_totale"] for item in risultato["items"])
-                totale_finale = risultato.get("totale_finale", totale_vendita)
-                proporzione = (totale_finale / totale_vendita) if totale_vendita else 1.0
-
-                for i, item in enumerate(risultato["items"]):
-                    # Applica proporzione per scontare i prezzi
-                    prezzo_totale_scontato = round(item["prezzo_totale"] * proporzione, 2)
-                    prezzo_unitario_scontato = round(item["prezzo_unitario"] * proporzione, 4)
-
-                    # Usa VenditaManager.registra_vendita come nel negozio
-                    from logic.negozio import VenditaManager
-
-                    # Registra vendita usando il manager (come nel negozio)
-                    codice_sconto = risultato.get("buono_applicato", {}).get("codice") if risultato.get(
-                        "buono_applicato") else None
-
-                    # 🔥 MODIFICATO: Aggiunto nome_progetto come parametro keyword
-                    vendita_id = VenditaManager.registra_vendita(
-                        negozio_id=negozio_id,
-                        progetto_id=item["progetto_id"],
-                        cliente=risultato["cliente"],
-                        quantita=item["quantita"],
-                        prezzo_totale=prezzo_totale_scontato,
-                        prezzo_unitario=prezzo_unitario_scontato,
-                        note=f"Da ordine #{risultato['ordine_id']}",
-                        codice_sconto=codice_sconto,
-                        nome_progetto=item["nome_visibile"]  # <-- QUESTO È IL NOME DEL PROGETTO!
-                    )
-
-                    if vendita_id:
-                        vendita_ids.append(vendita_id)
-
-                    print(
-                        f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id}, prezzo scontato: €{prezzo_totale_scontato:.2f})")
-
-                # Segna l'ordine come consegnato
                 cur.execute("UPDATE ordini SET consegnato = 1 WHERE id = ?", (risultato["ordine_id"],))
                 print(f"   ✅ Ordine {risultato['ordine_id']} segnato come consegnato")
 
-                # Prepara dati per applicare il buono DOPO la transazione
-                if risultato.get("buono_applicato") and vendita_ids and risultato.get("sconto", 0) > 0:
-                    buono_da_applicare = risultato["buono_applicato"]
-                    sconto_da_applicare = risultato["sconto"]
-                    vendita_ids_per_buono = vendita_ids
-
-            # 🔥 APPLICA IL BUONO DOPO LA TRANSAZIONE PRINCIPALE
-            if buono_da_applicare and vendita_ids_per_buono and sconto_da_applicare > 0:
+            # Applica buono se necessario
+            if risultato.get("buono_applicato") and vendita_ids and risultato.get("sconto", 0) > 0:
                 from logic.buoni import BuonoManager
+
+                buono_da_applicare = risultato["buono_applicato"]
+                sconto_da_applicare = risultato["sconto"]
+                vendita_ids_per_buono = vendita_ids
 
                 success, msg = BuonoManager.applica_utilizzo(
                     buono_id=buono_da_applicare["id"],
                     importo_utilizzato=sconto_da_applicare,
-                    vendita_id=vendita_ids_per_buono[0]  # Associa alla prima vendita
+                    vendita_id=vendita_ids_per_buono[0]  # associa al primo inserimento
                 )
 
                 if success:
@@ -554,8 +544,6 @@ class DettaglioOrdineWindow(tk.Toplevel):
             print("✅ VENDITA COMPLETATA CON SUCCESSO")
             print("=" * 60)
 
-            # Il dialog è già stato chiuso in on_confirm
-            # Mostra il messaggio e ricarica i dati
             mostra_info("✅ Successo", "Ordine venduto e registrato con successo!", parent=self.parent)
             self.parent.carica_dati()
 
@@ -566,8 +554,6 @@ class DettaglioOrdineWindow(tk.Toplevel):
             print(f"Errore: {e}")
             import traceback
             traceback.print_exc()
-
-            # Il dialog è già stato chiuso, mostra solo l'errore
             mostra_errore("Errore", str(e), parent=self.parent)
 
     def _centra_finestra(self):

@@ -149,7 +149,7 @@ def stampa_prodotto(parent, progetti_ordinati=None):
     """
     import tkinter as tk
     from tkcalendar import DateEntry
-    from tkinter import filedialog, messagebox
+
     import re
     import os
     from datetime import datetime
@@ -292,10 +292,10 @@ def stampa_prodotto(parent, progetti_ordinati=None):
     luogo_data = f"{citta} - {data}"
 
     # Preleva i dati dal config
-    prefill_nome = anagrafica.get("nome_cognome", "Pinco")
-    prefill_tessera = anagrafica.get("tessera", "004185H00008")
+    prefill_nome = anagrafica.get("nome_cognome", "Tuo Nome")
+    prefill_tessera = anagrafica.get("tessera", "12345678")
     prefill_rilasciato = anagrafica.get("rilasciato_il", "09/07/2024")
-    prefill_comune = anagrafica.get("comune", "Comune di comune")
+    prefill_comune = anagrafica.get("comune", "Comune di XXXX")
 
     # Genera nome file suggerito
     clean = re.sub(r'[^A-Za-z0-9_\-\s/]', '', luogo_data)

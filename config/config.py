@@ -8,10 +8,10 @@ CONFIG_FILE = "config.json"
 # Valori di default
 DEFAULT_CONFIG = {
     "anagrafica": {
-        "nome_cognome": "Nome Cognome",
+        "nome_cognome": "Tuo Nome",
         "tessera": "12345678",
         "rilasciato_il": "09/07/2024",
-        "comune": "Comune di Comune-Nome"
+        "comune": "Comune di XXXX"
     },
     "app": {
         "theme": "clam",

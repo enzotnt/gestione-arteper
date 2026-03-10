@@ -42,56 +42,6 @@ def add_column_if_missing(cursor, table, column_def):
 # RECORD SPECIALI PER ORDINI
 # -------------------------------------------------
 
-def ensure_special_records():
-    """Assicura che i record speciali per ordini esistano."""
-    with get_connection() as conn:
-        cursor = conn.cursor()
-
-        # Crea un progetto speciale per gli ordini
-        cursor.execute("SELECT id FROM progetti WHERE nome = '🔹 ORDINI CLIENTI'")
-        progetto = cursor.fetchone()
-
-        if not progetto:
-            cursor.execute("""
-                           INSERT INTO progetti
-                               (nome, data_creazione, moltiplicatore, stato_vendita, note)
-                           VALUES ('🔹 ORDINI CLIENTI', date ('now'), 1.0, '', 'Progetto speciale per ordini')
-                           """)
-            progetto_id = cursor.lastrowid
-            print(f"✅ Progetto speciale creato con ID: {progetto_id}")
-        else:
-            progetto_id = progetto[0]
-            print(f"✅ Progetto speciale esistente con ID: {progetto_id}")
-
-        # Crea il record in negozio associato al progetto speciale
-        cursor.execute("SELECT id FROM negozio WHERE id = -1")
-        if not cursor.fetchone():
-            try:
-                cursor.execute("""
-                               INSERT INTO negozio
-                               (id, progetto_id, nome_progetto_negozio, data_inserimento, prezzo_vendita, disponibili,
-                                venduti)
-                               VALUES (-1, ?, '📦 ORDINI CLIENTI', date ('now'), 0, 0, 0)
-                               """, (progetto_id,))
-                conn.commit()
-                print("✅ Record speciale per ordini creato in negozio (ID: -1)")
-                return -1
-            except sqlite3.IntegrityError:
-                # Se l'ID -1 è già occupato, trova un ID disponibile
-                cursor.execute("SELECT MAX(id) + 1 FROM negozio")
-                nuovo_id = cursor.fetchone()[0] or 1
-                cursor.execute("""
-                               INSERT INTO negozio
-                               (id, progetto_id, nome_progetto_negozio, data_inserimento, prezzo_vendita, disponibili,
-                                venduti)
-                               VALUES (?, ?, '📦 ORDINI CLIENTI', date ('now'), 0, 0, 0)
-                               """, (nuovo_id, progetto_id))
-                conn.commit()
-                print(f"✅ Record speciale per ordini creato con ID: {nuovo_id}")
-                return nuovo_id
-        else:
-            print("✅ Record speciale per ordini già esistente (ID: -1)")
-            return -1
 
 
 # -------------------------------------------------
@@ -749,6 +699,9 @@ def init_db():
         conn.commit()
         print("✅ Database inizializzato correttamente")
 
+        # NUOVA MODIFICA
+
+
     except Exception as e:
         print(f"❌ Errore durante l'inizializzazione del database: {e}")
         conn.rollback()
@@ -780,6 +733,6 @@ def backup_database(destinazione=None):
 
 if __name__ == "__main__":
     init_db()
-    ensure_special_records()
+
     print(f"📁 Database: {DB_PATH}")
     print("🏁 Inizializzazione completata!")

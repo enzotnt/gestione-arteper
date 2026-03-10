@@ -232,7 +232,7 @@ class ConfigDialog(tk.Toplevel):
                     else:  # linux
                         subprocess.run(['xdg-open', cartella])
                 except Exception as e:
-                    from tkinter import messagebox
+
                     messagebox.showerror("Errore", f"Impossibile aprire la cartella:\n{e}", parent=self)
 
         tk.Button(frame_sorgente, text="📂 Apri", command=apri_cartella_sorgente,
@@ -280,7 +280,7 @@ class ConfigDialog(tk.Toplevel):
                     else:  # linux
                         subprocess.run(['xdg-open', cartella])
                 except Exception as e:
-                    from tkinter import messagebox
+
                     messagebox.showerror("Errore", f"Impossibile aprire la cartella:\n{e}", parent=self)
 
         tk.Button(frame_dest, text="📂 Apri", command=apri_cartella_destinazione,

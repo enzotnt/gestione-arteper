@@ -2,9 +2,9 @@
 # Interfaccia per la gestione del magazzino - VERSIONE OTTIMIZZATA
 
 import tkinter as tk
-from tkinter import ttk, simpledialog, filedialog
-import os
 
+import os
+from tkinter import ttk, messagebox
 from logic import magazzino
 from utils.helpers import (
     mostra_info, mostra_attenzione, mostra_errore,
@@ -314,7 +314,7 @@ class TabMagazzino(tk.Frame):
                 for rw in self.row_widgets:
                     # Verifica quantità
                     if rw["qta_var"].get() > rw["max_quantita"]:
-                        from tkinter import messagebox
+
                         messagebox.showwarning("Quantità non valida",
                                                f"La quantità per {rw['nome']} supera la disponibilità.",
                                                parent=self)

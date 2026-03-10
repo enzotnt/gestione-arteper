@@ -1,19 +1,19 @@
 import tkinter as tk
 from tkinter import ttk
-
+from db.database import init_db
 from datetime import datetime
 from PIL import Image, ImageTk
 import os
 from utils.backup_db import backup_database, ripristina_backup
-from db.database import init_db, ensure_special_records
+from db.database import init_db
+from gui.config_dialog import ConfigDialog
 
-# prova
 
 from gui.magazzino_gui import TabMagazzino
 from gui.progetti_gui import TabProgetti
 from gui.venduti_gui import TabVenduti
 from gui.negozio_gui import TabNegozio
-from gui.mercatini_gui import TabMercatini
+from gui.mercatini_gui import TabMercatini  # Aggiungi questa linea
 from gui.ordini_gui import TabOrdini
 from gui.lavorazione_gui import TabLavorazione
 from gui.spese_gui import TabSpese
@@ -23,7 +23,7 @@ from gui.buoni_gui import TabBuoni
 def main():
     init_db()
 
-    ensure_special_records()
+
 
     root = tk.Tk()
     root.title("Gestione arTEper - Versione 3.5")
@@ -39,7 +39,6 @@ def main():
     icon_img = Image.open(icon_path)
     icon_tk = ImageTk.PhotoImage(icon_img)
     root.iconphoto(True, icon_tk)
-
 
     # ------------------- STILE -------------------
     style = ttk.Style()
