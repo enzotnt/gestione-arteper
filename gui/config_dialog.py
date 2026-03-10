@@ -11,7 +11,7 @@ class ConfigDialog(tk.Toplevel):
         self.parent = parent
         self.title("Configurazione Applicazione")
         self.configure(bg="#f7f1e1")
-        self.geometry("600x500")
+        self.geometry("850x500")
         self.transient(parent)
         self.grab_set()
 
