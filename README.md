@@ -1,45 +1,11 @@
-[# Manuale Utente - Gestione arTEper
+## 📥 Download
 
-# Manuale Utente - Gestione arTEper
+### 🏁 Windows (senza Python)
+👉 **[Scarica l'ultima versione per Windows](https://github.com/enzotnt/gestione-arteper/releases/latest)** 👈
 
-## 📥 Download e Installazione
-
-Scegli la versione più adatta alle tue esigenze:
-
-| Versione | Piattaforma | Requisiti | Link |
-|----------|-------------|-----------|------|
-| 🏁 **Windows (EXE)** | Windows 10/11 | Nessuno (pronto all'uso) | 👉 [Scarica da Google Drive](IL_TUO_LINK) 👈 |
-| 🐍 **Windows (Python)** | Windows | Python 3.8+ | [Istruzioni qui sotto](#windows-python) |
-| 🐧 **Linux** | Linux (Ubuntu 25+) | Python 3.8+ | [Istruzioni qui sotto](#linux) |
-
----
-
-### 🏁 **Windows (EXE) - Per chi NON ha Python**
-
-1. **Scarica** l'ultima versione dal link sopra
-2. **Estrai** il file ZIP in una cartella (es. `C:\Gestionale`)
-3. **Avvia** il programma facendo doppio click su `Gestionale_arTEper.exe`
-4. **Primo avvio**: Il programma creerà automaticamente le cartelle necessarie (`database`, `export`, `backup`)
-
-> ✅ **Testato su Windows 10 e 11**
-
----
-
-### 🐍 **Windows (con Python)** <a name="windows-python"></a>
-
-Se hai già Python installato, puoi usare il codice sorgente:
-
-```batch
-1. Clona il repository:
-   git clone https://github.com/enzotnt/gestione-arteper.git
-
-2. Apri il Prompt dei comandi (CMD) nella cartella del progetto
-
-3. Esegui lo script di installazione:
-   installa_windows.bat
-
-4. Al termine, avvia il programma:
-   avvia_windows.bat
+### 🐧 Linux / Utenti con Python
+- Clona il repository: `git clone https://github.com/enzotnt/gestione-arteper.git`
+- Segui le istruzioni nel README
 
 
 ## Introduzione
