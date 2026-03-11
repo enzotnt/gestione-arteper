@@ -1,5 +1,16 @@
 [# Manuale Utente - Gestione arTEper
 
+
+## 📥 Download
+
+### 🏁 Windows (senza Python)
+👉 **[Scarica l'ultima versione per Windows](https://github.com/enzotnt/gestione-arteper/releases/latest)** 👈
+
+### 🐧 Linux / Utenti con Python
+- Clona il repository: `git clone https://github.com/enzotnt/gestione-arteper.git`
+- Segui le istruzioni nel README
+
+
 ## Introduzione
 
 Benvenuto nel gestionale **arTEper**, un'applicazione progettata per gestire tutti gli aspetti della tua attività artigianale: dalla creazione di progetti alla vendita, passando per la gestione del magazzino, degli ordini e delle finanze. -(TESTATO SU UBUNTU 25.xx)
