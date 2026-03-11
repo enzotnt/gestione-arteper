@@ -241,10 +241,10 @@ class TabNegozio(tk.Frame):
         if luogo_data is None:
             return
 
-        prefill_nome = "Nome "
+        prefill_nome = "Tuo Nome"
         prefill_tessera = "12345678"
         prefill_rilasciato = "09/07/2024"
-        prefill_comune = "Comune di comune"
+        prefill_comune = "Comune di XXXX"
 
         # Genera nome file suggerito
         import re

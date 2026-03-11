@@ -1,0 +1,7 @@
+pillow>=10.0.0
+reportlab>=4.0.0
+matplotlib>=3.7.0
+tkcalendar>=1.6.1
+mplcursors>=0.5.2
+pyperclip>=1.8.2
+python-dateutil>=2.8.2

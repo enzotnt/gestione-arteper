@@ -1,3 +1,85 @@
+# All'inizio del file, dopo gli import
+import sys
+import os
+
+def setup_environment():
+    """Configura l'ambiente per l'EXE"""
+    if getattr(sys, 'frozen', False):
+        # Siamo in un EXE
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Siamo in sviluppo
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    # Vai nella cartella base
+    os.chdir(base_path)
+    
+    # Crea le cartelle necessarie
+    cartelle = ["database", "icons", "export", "backup"]
+    for cartella in cartelle:
+        percorso = os.path.join(base_path, cartella)
+        if not os.path.exists(percorso):
+            os.makedirs(percorso)
+    
+    # Crea config.json se non esiste
+    config_path = os.path.join(base_path, "config.json")
+    if not os.path.exists(config_path):
+        with open(config_path, "w", encoding='utf-8') as f:
+            f.write("{}")
+    
+    return base_path
+
+# CHIAMA SUBITO LA FUNZIONE
+BASE_PATH = setup_environment()
+# main_con_avvio.py - Versione con gestione cartelle integrata
+import os
+import sys
+
+# =============================================================================
+# GESTIONE CARTELLE ALL'AVVIO
+# =============================================================================
+def crea_struttura_cartelle():
+    """Crea le cartelle necessarie se non esistono"""
+    # Determina dove siamo (sviluppo o EXE)
+    if getattr(sys, 'frozen', False):
+        # Siamo in un EXE
+        base_path = os.path.dirname(sys.executable)
+    else:
+        # Siamo in sviluppo
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    
+    # Vai nella cartella base
+    os.chdir(base_path)
+    
+    cartelle = ["database", "icons", "export", "backup"]
+    for cartella in cartelle:
+        if not os.path.exists(cartella):
+            try:
+                os.makedirs(cartella)
+            except:
+                pass
+    
+    # Crea config.json se non esiste
+    if not os.path.exists("config.json"):
+        try:
+            with open("config.json", "w", encoding='utf-8') as f:
+                f.write("{}")
+        except:
+            pass
+
+# Chiama subito la funzione
+crea_struttura_cartelle()
+
+# =============================================================================
+# ORA COPIA TUTTO IL TUO MAIN.PY ORIGINALE QUI SOTTO
+# =============================================================================
+
+# [INCORPORA QUI TUTTO IL CONTENUTO DEL TUO main.py ORIGINALE]
+# Copia da "import tkinter as tk" fino alla fine del file
+
+# Esempio di inizio del tuo codice originale:
+
+
 import tkinter as tk
 from tkinter import ttk
 from db.database import init_db
@@ -5,7 +87,7 @@ from datetime import datetime
 from PIL import Image, ImageTk
 import os
 from utils.backup_db import backup_database, ripristina_backup
-from db.database import init_db, ensure_special_records
+from db.database import init_db
 from gui.config_dialog import ConfigDialog
 
 
@@ -23,7 +105,7 @@ from gui.buoni_gui import TabBuoni
 def main():
     init_db()
 
-    ensure_special_records()
+
 
     root = tk.Tk()
     root.title("Gestione arTEper - Versione 3.5")
@@ -39,7 +121,6 @@ def main():
     icon_img = Image.open(icon_path)
     icon_tk = ImageTk.PhotoImage(icon_img)
     root.iconphoto(True, icon_tk)
-
 
     # ------------------- STILE -------------------
     style = ttk.Style()

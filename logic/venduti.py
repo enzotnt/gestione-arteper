@@ -303,3 +303,43 @@ class VendutiManager:
         for item in items:
             items_list.append(f"{item['progetto']} ({item['quantita']}x{item['prezzo_unitario']:.2f}€)")
         return ", ".join(items_list)
+
+    @staticmethod
+    def registra_vendita(progetto_id: int,
+                         cliente: str,
+                         quantita: int,
+                         prezzo_totale: float,
+                         prezzo_unitario: float,
+                         note: str = "",
+                         nome_progetto: Optional[str] = None,
+                         immagine_percorso: Optional[str] = None) -> int:
+        """
+        Inserisce una nuova vendita direttamente nella tabella 'venduti'.
+        Restituisce l'ID della vendita appena creata.
+        """
+        conn = get_connection()
+        c = conn.cursor()
+        try:
+            data_vendita = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            c.execute("""
+                      INSERT INTO venduti (negozio_id, cliente, quantita, prezzo_totale, prezzo_unitario, note, nome,
+                                           immagine_percorso, data_vendita)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      """, (
+                          progetto_id,  # negozio_id, ma in questo caso lo usi per identificare il progetto
+                          cliente,
+                          quantita,
+                          prezzo_totale,
+                          prezzo_unitario,
+                          note,
+                          nome_progetto,
+                          immagine_percorso,
+                          data_vendita
+                      ))
+            conn.commit()
+            return c.lastrowid
+        except Exception as e:
+            conn.rollback()
+            raise Exception(f"Errore durante l'inserimento della vendita: {e}")
+        finally:
+            conn.close()

@@ -11,7 +11,7 @@ class ConfigDialog(tk.Toplevel):
         self.parent = parent
         self.title("Configurazione Applicazione")
         self.configure(bg="#f7f1e1")
-        self.geometry("600x500")
+        self.geometry("850x500")
         self.transient(parent)
         self.grab_set()
 
@@ -232,7 +232,7 @@ class ConfigDialog(tk.Toplevel):
                     else:  # linux
                         subprocess.run(['xdg-open', cartella])
                 except Exception as e:
-                    from tkinter import messagebox
+
                     messagebox.showerror("Errore", f"Impossibile aprire la cartella:\n{e}", parent=self)
 
         tk.Button(frame_sorgente, text="📂 Apri", command=apri_cartella_sorgente,
@@ -280,7 +280,7 @@ class ConfigDialog(tk.Toplevel):
                     else:  # linux
                         subprocess.run(['xdg-open', cartella])
                 except Exception as e:
-                    from tkinter import messagebox
+
                     messagebox.showerror("Errore", f"Impossibile aprire la cartella:\n{e}", parent=self)
 
         tk.Button(frame_dest, text="📂 Apri", command=apri_cartella_destinazione,
