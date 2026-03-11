@@ -6,7 +6,7 @@
 ### 🏁 Windows (senza Python)
 👉 **[Scarica l'ultima versione per Windows](https://github.com/enzotnt/gestione-arteper/releases/latest)** 👈
 
-### 🐧 Linux / Utenti con Python
+### 🐧 Linux /  Windows (con Python)
 - Clona il repository: `git clone https://github.com/enzotnt/gestione-arteper.git`
 - Segui le istruzioni nel README
 
