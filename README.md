@@ -1,4 +1,39 @@
-[# Manuale Utente - Gestione arTEper
+# Manuale Utente - Gestione arTEper
+
+## 📥 Download
+
+### 🏁 Windows (senza Python)
+👉 **[Scarica l'ultima versione per Windows](https://github.com/enzotnt/gestione-arteper/releases/latest)** 👈  
+✅ INSTALLAZIONE:
+1. Estrai tutto in una cartella (es. C:\Gestionale)
+2. Fai doppio click su "Gestionale_arTEper.exe"
+3. Il programma si avvia!
+
+📁 STRUTTURA:
+- Gestionale_arTEper.exe  ← il programma
+- icons\                   ← icone (non spostare!)
+- database\                 ← qui vengono salvati i tuoi dati
+- export\                   ← qui finiscono i PDF
+- backup\                   ← qui vanno i backup
+
+📌 NOTE:
+- Non spostare l'EXE fuori dalla cartella
+- La cartella icons deve stare nella stessa posizione dell'EXE
+- I dati vengono salvati nella cartella database
+
+❓ PROBLEMI?
+- Se non si avvia, controlla che la cartella "icons" sia presente
+- Per supporto: apri una issue su GitHub
+
+🐍 Versione con Python: https://github.com/enzotnt/gestione-arteper
+
+### 🐍 Linux / Windows (con Python)
+- Clona il repository: `git clone https://github.com/enzotnt/gestione-arteper.git`
+- Entra nella cartella: `cd gestione-arteper`
+- Per Linux: esegui `./installa_linux.sh` poi `./avvia_gestionale.sh`
+- Per Windows con Python: esegui `installa_windows.bat` poi `avvia_windows.bat`
+
+---
 
 ## Introduzione
 
