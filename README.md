@@ -21,9 +21,9 @@
 - La cartella icons deve stare nella stessa posizione dell'EXE
 - I dati vengono salvati nella cartella database
 
-❓ PROBLEMI?
+❓ **PROBLEMI?**
 - Se non si avvia, controlla che la cartella "icons" sia presente
-- Per supporto: apri una issue su GitHub
+- Per supporto: [apri una issue su GitHub](https://github.com/enzotnt/gestione-arteper/issues/new)
 
 🐍 Versione con Python: https://github.com/enzotnt/gestione-arteper
 
