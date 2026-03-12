@@ -7,7 +7,7 @@
 ✅ INSTALLAZIONE:
 1. Estrai tutto in una cartella (es. C:\Gestionale)
 2. Fai doppio click su "Gestionale_arTEper.exe"
-3. Il programma si avvia!
+3. Il programma si avvia. :-)
 
 📁 STRUTTURA:
 - Gestionale_arTEper.exe  ← il programma
