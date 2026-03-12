@@ -18,6 +18,7 @@ database/backup_*.db
 
 # Configurazioni locali
 config.json
+creaEXE.txt
 
 # Cartelle di export e backup
 export/

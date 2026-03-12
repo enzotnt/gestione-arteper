@@ -2,6 +2,18 @@
 import sys
 import os
 
+
+import requests
+
+def ping_utilizzo():
+    try:
+        requests.get(
+            "https://api.counterapi.dev/v1/enzos-team/arteper_avvii/up",
+            timeout=2
+        )
+    except:
+        pass
+
 def setup_environment():
     """Configura l'ambiente per l'EXE"""
     if getattr(sys, 'frozen', False):
@@ -45,7 +57,7 @@ def crea_struttura_cartelle():
         # Siamo in un EXE
         base_path = os.path.dirname(sys.executable)
     else:
-        # Siamo in sviluppo
+        # Siamo in svilupp
         base_path = os.path.dirname(os.path.abspath(__file__))
     
     # Vai nella cartella base
@@ -105,6 +117,8 @@ from gui.buoni_gui import TabBuoni
 def main():
     init_db()
 
+    # Ping statistica utilizzo
+    ping_utilizzo()
 
 
     root = tk.Tk()
