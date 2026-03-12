@@ -57,7 +57,7 @@ def crea_struttura_cartelle():
         # Siamo in un EXE
         base_path = os.path.dirname(sys.executable)
     else:
-        # Siamo in svilupp
+        # Siamo in sviluppo
         base_path = os.path.dirname(os.path.abspath(__file__))
     
     # Vai nella cartella base
