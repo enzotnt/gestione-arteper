@@ -20,7 +20,7 @@ def setup_environment():
         # Siamo in un EXE
         base_path = os.path.dirname(sys.executable)
     else:
-        # Siamo in sviluppo
+        # Siamo in svilupp
         base_path = os.path.dirname(os.path.abspath(__file__))
     
     # Vai nella cartella base
