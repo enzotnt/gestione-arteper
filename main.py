@@ -33,7 +33,7 @@ def setup_environment():
         if not os.path.exists(percorso):
             os.makedirs(percorso)
     
-    # Crea config.json se non esiste
+    # Crea config.json se non esiste.
     config_path = os.path.join(base_path, "config.json")
     if not os.path.exists(config_path):
         with open(config_path, "w", encoding='utf-8') as f:
