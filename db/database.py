@@ -315,6 +315,7 @@ def init_db():
 
         add_column_if_missing(cursor, "progetti", "stato_vendita TEXT DEFAULT ''")
         add_column_if_missing(cursor, "venduti", "immagine_percorso TEXT")
+        add_column_if_missing(cursor, "venduti", "ordine_id INTEGER")
 
         add_column_if_missing(cursor, "progetti_ordinati", "assemblato INTEGER DEFAULT 0")
         add_column_if_missing(cursor, "progetti_ordinati", "data_lavorazione TEXT")

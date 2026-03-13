@@ -28,10 +28,10 @@ class OrdineManager:
         """
         with db_cursor() as cur:
             cur.execute("""
-                SELECT id, cliente, data_consegna, data_inserimento, consegnato, note
-                FROM ordini
-                ORDER BY data_inserimento DESC
-            """)
+                        SELECT id, cliente, data_consegna, data_inserimento, consegnato, note, stato_pagamento
+                        FROM ordini
+                        ORDER BY data_inserimento DESC
+                        """)
             columns = [desc[0] for desc in cur.description]
             return [dict(zip(columns, row)) for row in cur.fetchall()]
 
@@ -52,6 +52,7 @@ class OrdineManager:
     def get_progetti_ordinati(ordine_id: int) -> List[Dict]:
         """
         Restituisce i progetti associati a un ordine con i relativi prezzi.
+        I prezzi vengono presi dalla tabella ordini (valori originali).
         """
         with db_cursor() as cur:
             cur.execute("""
@@ -60,9 +61,12 @@ class OrdineManager:
                                po.prezzo_unitario,
                                po.prezzo_totale,
                                po.assemblato,
-                               po.data_lavorazione
+                               po.data_lavorazione,
+                               -- 🔥 AGGIUNGIAMO ANCHE IL PREZZO TOTALE DELL'ORDINE PER VERIFICA
+                               o.prezzo_totale AS ordine_totale
                         FROM progetti_ordinati po
                                  JOIN progetti p ON po.progetto_id = p.id
+                                 JOIN ordini o ON po.ordine_id = o.id -- 🔥 JOIN CON ORDINI
                         WHERE po.ordine_id = ?
                         """, (ordine_id,))
 
@@ -76,6 +80,12 @@ class OrdineManager:
                 if dati["prezzo_totale"] is None:
                     dati["prezzo_totale"] = 0.0
                 risultati.append(dati)
+
+                # 🔍 DEBUG PRINT
+                print(f"DEBUG - Ordine {ordine_id}, Progetto {dati['nome']}:")
+                print(f"   prezzo_unitario: {dati['prezzo_unitario']}")
+                print(f"   prezzo_totale: {dati['prezzo_totale']}")
+                print(f"   ordine_totale: {dati.get('ordine_totale')}")
 
             return risultati
 

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from logic.venduti import VendutiManager
 from utils.gui_utils import ordina_colonna_treeview, mostra_immagine_zoom
-
+import sqlite3
 
 class TabVenduti(ttk.Frame):
     def __init__(self, parent):
@@ -76,18 +76,24 @@ class TabVenduti(ttk.Frame):
 
     def carica_dati(self):
         """Popola la tree con i dati del manager."""
+        print("\n" + "=" * 60)
+        print("🔍 DEBUG - TabVenduti.carica_dati()")
+        print("=" * 60)
+        print(f"   Modalità aggregata: {self.aggregated}")
+
         # Distruggi tree precedente se esistente
         if self.tree:
             self.tree.destroy()
 
         if self.aggregated:
-            # Vista aggregata per cliente
-            columns = ("Cliente", "Oggetti acquistati", "Quantità tot.", "Totale (€)", "Ultima vendita")
-            col_widths = {"Cliente": 160, "Oggetti acquistati": 400, "Quantità tot.": 100,
-                          "Totale (€)": 100, "Ultima vendita": 140}
-            dati = VendutiManager.get_vendite_aggregate()
+            # Vista aggregata per cliente - ora usa gli ORDINI
+            columns = ("Cliente", "Ordini", "Quantità tot.", "Totale (€)", "Ultimo ordine")
+            col_widths = {"Cliente": 160, "Ordini": 400, "Quantità tot.": 100,
+                          "Totale (€)": 100, "Ultimo ordine": 140}
+            print("   📊 Chiamo VendutiManager.get_ordini_aggregati()")
+            dati = VendutiManager.get_ordini_aggregati()
         else:
-            # Vista dettaglio
+            # Vista dettaglio (per ora lasciamo venduti)
             columns = ("ID", "Data", "Cliente", "Quantità", "Totale", "Unitario",
                        "Costo", "Ricavo", "Progetto", "Note")
             col_widths = {
@@ -95,7 +101,10 @@ class TabVenduti(ttk.Frame):
                 "Totale": 80, "Unitario": 80, "Costo": 80, "Ricavo": 80,
                 "Progetto": 200, "Note": 250
             }
+            print("   📊 Chiamo VendutiManager.get_vendite_dettaglio()")
             dati = VendutiManager.get_vendite_dettaglio()
+
+        print(f"   📊 Dati ricevuti: {len(dati)} record")
 
         # Crea nuova tree
         self.tree = ttk.Treeview(self, columns=columns, show="tree headings")
@@ -112,13 +121,26 @@ class TabVenduti(ttk.Frame):
 
         # Popola la tree
         if self.aggregated:
-            self._popola_tree_aggregata(dati)
+            self._popola_tree_aggregata_ordini(dati)  # Nuova funzione
         else:
             self._popola_tree_dettaglio(dati)
 
         # Riapplica ordinamento se necessario
         if self.ordine_colonna:
             self.ordina_per(self.ordine_colonna, forza=True)
+
+        print("=" * 60)
+
+    def _popola_tree_aggregata_ordini(self, dati):
+        """Popola la tree con dati aggregati per cliente (dagli ordini)."""
+        for cliente_info in dati:
+            self.tree.insert("", "end", text="", values=(
+                cliente_info["cliente"],
+                cliente_info["items_str"],  # Ora mostra gli ordini
+                cliente_info["quantita_totale"],
+                f"{cliente_info['totale']:.2f}€",
+                cliente_info["ultima_data"] or ""
+            ))
 
     def _popola_tree_aggregata(self, dati):
         """Popola la tree con dati aggregati per cliente."""
@@ -196,49 +218,117 @@ class TabVenduti(ttk.Frame):
         else:
             try:
                 item_id = int(vals[0])
-                DettaglioVendita(self, item_id, self)
-            except Exception:
-                messagebox.showerror("Errore", "Impossibile aprire il dettaglio della vendita.")
+                # 🔥 Qui possiamo passare anche altri dati se necessario
+                dettaglio = DettaglioVendita(self, item_id, self)
+            except Exception as e:
+                messagebox.showerror("Errore", f"Impossibile aprire il dettaglio della vendita: {e}")
 
     def _mostra_dettagli_cliente(self, cliente_nome):
-        """Mostra una finestra con i dettagli delle vendite del cliente."""
+        """Mostra una finestra con i dettagli degli ORDINI del cliente (prezzi originali)."""
         dlg = tk.Toplevel(self)
-        dlg.title(f"Vendite per: {cliente_nome}")
-        dlg.geometry("800x460")
+        dlg.title(f"Ordini per: {cliente_nome}")
+        dlg.geometry("1200x600")
         dlg.configure(bg="#f7f1e1")
 
-        # Treeview per le vendite del cliente
-        tv = ttk.Treeview(dlg, columns=("Data", "Progetto", "Quantità", "Prezzo unit.", "Totale"),
-                          show="headings")
-        for h, w in [("Data", 140), ("Progetto", 360), ("Quantità", 80), ("Prezzo unit.", 100), ("Totale", 100)]:
-            tv.heading(h, text=h)
-            tv.column(h, width=w, anchor="center")
-        tv.pack(fill="both", expand=True, padx=8, pady=(8, 4))
+        # Frame per la treeview con scrollbar
+        tree_frame = tk.Frame(dlg, bg="#f7f1e1")
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Carica dati dal manager
-        vendite = VendutiManager.get_vendite_cliente(cliente_nome)
-        totale_cliente = 0.0
+        # Treeview per gli ordini del cliente
+        tv = ttk.Treeview(tree_frame,
+                          columns=("ID Ordine", "Data", "Progetti", "Quantità", "Totale Ordine", "Stato"),
+                          show="headings", height=15)
 
-        for v in vendite:
+        # Scrollbar verticale
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical", command=tv.yview)
+        tv.configure(yscrollcommand=vsb.set)
+
+        # Scrollbar orizzontale
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal", command=tv.xview)
+        tv.configure(xscrollcommand=hsb.set)
+
+        # 🔥 CONFIGURAZIONE COLONNE OTTIMIZZATA
+        column_config = [
+            ("ID Ordine", 60, "center"),  # Più stretto (max 3 cifre)
+            ("Data", 100, "center"),  # Invariato
+            ("Progetti", 450, "center"),  # Leggermente ridotto
+            ("Quantità", 80, "center"),  # Invariato
+            ("Totale Ordine", 120, "center"),  # Invariato
+            ("Stato", 250, "center")  # 🔥 Più largo per il testo lungo
+        ]
+
+        for col, width, anchor in column_config:
+            tv.heading(col, text=col)
+            tv.column(col, width=width, anchor=anchor)
+
+        # Posizionamento grid
+        tv.grid(row=0, column=0, sticky="nsew")
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
+
+        # Carica gli ORDINI dal database
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        c.execute("""
+                  SELECT o.id,
+                         o.data_inserimento,
+                         o.prezzo_totale,
+                         o.stato_pagamento,
+                         o.consegnato,
+                         GROUP_CONCAT(p.nome, ', ') AS progetti,
+                         SUM(po.quantita)           AS quantita_totale
+                  FROM ordini o
+                           LEFT JOIN progetti_ordinati po ON o.id = po.ordine_id
+                           LEFT JOIN progetti p ON po.progetto_id = p.id
+                  WHERE o.cliente = ?
+                  GROUP BY o.id
+                  ORDER BY o.data_inserimento DESC
+                  """, (cliente_nome,))
+
+        ordini = c.fetchall()
+        conn.close()
+
+        totale_complessivo = 0.0
+
+        for o in ordini:
+            # Determina lo stato
+            if o["consegnato"]:
+                stato = "✅ Consegnato"
+            else:
+                stato = "⏳ In lavorazione"
+
+            # Aggiungi informazioni pagamento se presenti
+            if o["stato_pagamento"] and "PAGATO" in o["stato_pagamento"]:
+                stato += f" - {o['stato_pagamento']}"
+
             tv.insert("", "end", values=(
-                v["data"] or "",
-                v["progetto"] or "",
-                v["quantita"],
-                f"{v['prezzo_unitario']:.2f}€" if v['prezzo_unitario'] else "N/A",
-                f"{v['prezzo_totale']:.2f}€" if v['prezzo_totale'] else "N/A"
+                o["id"],
+                o["data_inserimento"][:10] if o["data_inserimento"] else "",
+                o["progetti"] or "-",
+                o["quantita_totale"] or 0,
+                f"€ {o['prezzo_totale']:.2f}" if o['prezzo_totale'] else "€ 0.00",
+                stato
             ))
-            if v["prezzo_totale"]:
-                totale_cliente += v["prezzo_totale"]
 
-        # Footer con totale
+            if o["prezzo_totale"]:
+                totale_complessivo += o["prezzo_totale"]
+
+        # Footer con totale complessivo
         bottom_frame = tk.Frame(dlg, bg="#f7f1e1")
-        bottom_frame.pack(fill="x", padx=8, pady=(6, 10))
+        bottom_frame.pack(fill="x", padx=10, pady=10)
 
-        totale_label = tk.Label(bottom_frame, text=f"Totale cliente: {totale_cliente:.2f}€",
-                                font=("Segoe UI", 11, "bold"), bg="#f7f1e1")
-        totale_label.pack(side="right", padx=10)
+        totale_label = tk.Label(bottom_frame,
+                                text=f"Totale complessivo ordini: € {totale_complessivo:.2f}",
+                                font=("Segoe UI", 12, "bold"), bg="#f7f1e1", fg="#3366cc")
+        totale_label.pack(side="left", padx=10)
 
-        tk.Button(bottom_frame, text="Chiudi", command=dlg.destroy).pack(side="right", padx=6)
+        tk.Button(bottom_frame, text="Chiudi", command=dlg.destroy,
+                  bg="#f0f0f0", font=("Segoe UI", 10), padx=20).pack(side="right", padx=10)
 
     def elimina_vendita(self):
         """Elimina la vendita selezionata."""

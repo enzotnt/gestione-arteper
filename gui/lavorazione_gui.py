@@ -469,7 +469,7 @@ class DettaglioOrdineWindow(tk.Toplevel):
         self._processa_vendita_ordine(risultato)
 
     def _processa_vendita_ordine(self, risultato):
-        """Processa la vendita dell'ordine direttamente in Venduti senza passare da negozio."""
+        """Processa la vendita dell'ordine direttamente in Venduti e aggiorna negozio."""
         print("\n" + "=" * 60)
         print("🔍 DEBUG VENDITA ORDINE")
         print("=" * 60)
@@ -490,38 +490,105 @@ class DettaglioOrdineWindow(tk.Toplevel):
 
             vendita_ids = []
 
-            for i, item in enumerate(risultato["items"]):
-                prezzo_totale_scontato = round(item["prezzo_totale"] * proporzione, 2)
-                prezzo_unitario_scontato = round(item["prezzo_unitario"] * proporzione, 4)
+            # 🔥 USA UNA SOLA CONNESSIONE PER TUTTO
+            conn = get_connection()
+            cur = conn.cursor()
 
-                codice_sconto = risultato.get("buono_applicato", {}).get("codice") if risultato.get(
-                    "buono_applicato") else None
+            try:
+                for i, item in enumerate(risultato["items"]):
+                    prezzo_totale_scontato = round(item["prezzo_totale"] * proporzione, 2)
+                    prezzo_unitario_scontato = round(item["prezzo_unitario"] * proporzione, 4)
 
-                # 🔥 Inserimento diretto in Venduti
-                vendita_id = VendutiManager.registra_vendita(
-                    progetto_id=item["progetto_id"],
-                    cliente=risultato["cliente"],
-                    quantita=item["quantita"],
-                    prezzo_totale=prezzo_totale_scontato,
-                    prezzo_unitario=prezzo_unitario_scontato,
-                    note=f"Da ordine #{risultato['ordine_id']}",
-                    nome_progetto=item["nome_visibile"],
-                    immagine_percorso=item.get("immagine_percorso")
-                )
+                    # 🔥 PASSO 1: AGGIORNA TABELLA NEGOZIO
+                    # Verifica se il progetto esiste già in negozio
+                    cur.execute("""
+                                SELECT id, disponibili, venduti
+                                FROM negozio
+                                WHERE progetto_id = ?
+                                """, (item["progetto_id"],))
+                    esistente = cur.fetchone()
 
-                if vendita_id:
-                    vendita_ids.append(vendita_id)
+                    if esistente:
+                        # ✅ Progetto esiste: incrementa SOLO venduti
+                        negozio_id, disponibili, venduti_attuali = esistente
+                        nuovi_venduti = venduti_attuali + item["quantita"]
 
-                print(
-                    f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id}, prezzo scontato: €{prezzo_totale_scontato:.2f})"
-                )
+                        cur.execute("""
+                                    UPDATE negozio
+                                    SET venduti = ?
+                                    WHERE id = ?
+                                    """, (nuovi_venduti, negozio_id))
 
-            # Segna l'ordine come consegnato
-            with db_cursor(commit=True) as cur:
-                cur.execute("UPDATE ordini SET consegnato = 1 WHERE id = ?", (risultato["ordine_id"],))
+                        print(
+                            f"   ✅ Incrementati venduti per progetto {item['progetto_id']}: {venduti_attuali} → {nuovi_venduti}")
+                    else:
+                        # ✅ Progetto non esiste: crea record con disponibili=0, venduti=quantita
+                        cur.execute("SELECT nome FROM progetti WHERE id = ?", (item["progetto_id"],))
+                        nome_progetto = cur.fetchone()[0]
+
+                        data_inserimento = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                        cur.execute("""
+                                    INSERT INTO negozio
+                                    (progetto_id, nome_progetto_negozio, data_inserimento,
+                                     prezzo_vendita, disponibili, venduti)
+                                    VALUES (?, ?, ?, ?, 0, ?)
+                                    """, (item["progetto_id"], nome_progetto, data_inserimento,
+                                          prezzo_unitario_scontato, item["quantita"]))
+
+                        print(
+                            f"   ✅ Creato record in negozio per progetto {item['progetto_id']} con venduti={item['quantita']}")
+
+                        # Ottieni l'ID appena inserito
+                        negozio_id = cur.lastrowid
+
+                    # 🔥 PASSO 2: REGISTRA IN VENDUTI
+                    data_vendita = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    cur.execute("""
+                                INSERT INTO venduti (negozio_id, cliente, quantita, prezzo_totale,
+                                                     prezzo_unitario, note, nome, data_vendita)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                """, (negozio_id,
+                                      risultato["cliente"],
+                                      item["quantita"],
+                                      prezzo_totale_scontato,
+                                      prezzo_unitario_scontato,
+                                      f"Da ordine #{risultato['ordine_id']}",
+                                      item["nome_visibile"],
+                                      data_vendita))
+
+                    vendita_id = cur.lastrowid
+                    if vendita_id:
+                        vendita_ids.append(vendita_id)
+
+                    print(f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id})")
+
+                # 🔥 PASSO 3: SEGNA ORDINE COME CONSEGNATO E AGGIORNA STATO PAGAMENTO
+                data_ora = datetime.now().strftime("%d/%m/%Y %H:%M")
+                stato_pagamento = f"PAGATO {data_ora}"
+
+                cur.execute("""
+                            UPDATE ordini
+                            SET consegnato      = 1,
+                                stato_pagamento = ?
+                            WHERE id = ?
+                            """, (stato_pagamento, risultato["ordine_id"]))
+
                 print(f"   ✅ Ordine {risultato['ordine_id']} segnato come consegnato")
+                print(f"   ✅ Stato pagamento aggiornato: {stato_pagamento}")
 
-            # Applica buono se necessario
+                # 🔥 COMMIT FINALE
+                conn.commit()
+                print("   ✅ Transazione completata con successo")
+
+            except Exception as e:
+                conn.rollback()
+                print(f"❌ Errore durante la transazione: {e}")
+                raise
+            finally:
+                conn.close()
+
+            # Applica buono se necessario (fuori dalla transazione principale)
             if risultato.get("buono_applicato") and vendita_ids and risultato.get("sconto", 0) > 0:
                 from logic.buoni import BuonoManager
 
@@ -532,7 +599,7 @@ class DettaglioOrdineWindow(tk.Toplevel):
                 success, msg = BuonoManager.applica_utilizzo(
                     buono_id=buono_da_applicare["id"],
                     importo_utilizzato=sconto_da_applicare,
-                    vendita_id=vendita_ids_per_buono[0]  # associa al primo inserimento
+                    vendita_id=vendita_ids_per_buono[0]
                 )
 
                 if success:

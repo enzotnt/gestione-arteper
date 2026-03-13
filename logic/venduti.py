@@ -9,89 +9,6 @@ class VendutiManager:
     """Gestisce la logica di business per le vendite."""
 
     @staticmethod
-    def get_vendite_aggregate() -> List[Dict]:
-        """
-        Recupera tutte le vendite e le raggruppa per cliente.
-        Restituisce una lista di dizionari con i dati aggregati per cliente.
-        """
-        conn = get_connection()
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-
-        c.execute("""
-                  SELECT v.cliente                                                            AS cliente,
-                         COALESCE(p.nome, v.nome)                                             AS progetto_nome,
-                         v.quantita                                                           AS quantita,
-                         v.prezzo_unitario                                                    AS prezzo_unitario,
-                         COALESCE(v.prezzo_totale, v.quantita * IFNULL(v.prezzo_unitario, 0)) AS prezzo_totale,
-                         v.data_vendita                                                       AS data_vendita
-                  FROM venduti v
-                           LEFT JOIN negozio n ON v.negozio_id = n.id
-                           LEFT JOIN progetti p ON n.progetto_id = p.id
-                  ORDER BY v.cliente COLLATE NOCASE, v.data_vendita DESC
-                  """)
-        righe = c.fetchall()
-        conn.close()
-
-        # Raggruppa per cliente in Python
-        clienti = {}
-        for r in righe:
-            cliente = (r["cliente"] or "").strip() or "[Cliente non specificato]"
-            proj = r["progetto_nome"] or "[Sconosciuto]"
-            qta = int(r["quantita"] or 0)
-            unit = float(r["prezzo_unitario"] or 0.0)
-            tot = float(r["prezzo_totale"] or (qta * unit))
-            data = r["data_vendita"]
-
-            if cliente not in clienti:
-                clienti[cliente] = {
-                    "items": {},  # progetto -> {'qta': X, 'unit': unit, 'tot': Y}
-                    "quantita_tot": 0,
-                    "totale": 0.0,
-                    "ultima_data": data
-                }
-
-            # accumula quantità e totali per progetto
-            items = clienti[cliente]["items"]
-            if proj not in items:
-                items[proj] = {"qta": 0, "unit": unit, "tot": 0.0}
-            items[proj]["qta"] += qta
-            items[proj]["unit"] = unit
-            items[proj]["tot"] += tot
-
-            clienti[cliente]["quantita_tot"] += qta
-            clienti[cliente]["totale"] += tot
-
-            # aggiorna ultima_data (max)
-            try:
-                if data and (not clienti[cliente]["ultima_data"] or data > clienti[cliente]["ultima_data"]):
-                    clienti[cliente]["ultima_data"] = data
-            except Exception:
-                pass
-
-        # Trasforma in lista ordinata
-        risultati = []
-        for cliente, info in sorted(clienti.items(), key=lambda t: t[0].lower()):
-            items_list = []
-            for proj, dat in info["items"].items():
-                items_list.append({
-                    "progetto": proj,
-                    "quantita": dat["qta"],
-                    "prezzo_unitario": dat["unit"],
-                    "totale": dat["tot"]
-                })
-
-            risultati.append({
-                "cliente": cliente,
-                "items": items_list,
-                "quantita_totale": info["quantita_tot"],
-                "totale": info["totale"],
-                "ultima_data": info["ultima_data"]
-            })
-
-        return risultati
-
-    @staticmethod
     def get_vendite_dettaglio() -> List[Dict]:
         """
         Recupera tutte le vendite in formato dettaglio (una riga per vendita).
@@ -100,29 +17,56 @@ class VendutiManager:
         conn.row_factory = sqlite3.Row
         c = conn.cursor()
 
+        print("\n" + "=" * 60)
+        print("🔍 DEBUG - get_vendite_dettaglio()")
+        print("=" * 60)
+
+        # Prima, vediamo se ci sono ordine_id nei venduti
+        c.execute("SELECT id, ordine_id FROM venduti WHERE ordine_id IS NOT NULL")
+        rows = c.fetchall()
+        print(f"Vendite con ordine_id: {len(rows)}")
+        for row in rows:
+            print(f"  - Vendita ID: {row['id']}, ordine_id: {row['ordine_id']}")
+
+        # Ora eseguiamo la query principale
         c.execute("""
                   SELECT v.id,
                          v.data_vendita           AS data,
                          v.cliente,
                          v.quantita,
-                         v.prezzo_totale,
+                         v.prezzo_totale          AS prezzo_vendita,
+                         o.prezzo_totale          AS prezzo_ordine,
+                         -- 🔥 PREZZO TOTALE: se c'è ordine, prendi il valore originale dell'ordine
+                         CASE
+                             WHEN o.id IS NOT NULL THEN o.prezzo_totale
+                             ELSE v.prezzo_totale
+                             END                  AS prezzo_totale,
                          v.prezzo_unitario,
                          v.costo_totale,
                          v.ricavo,
                          v.note,
                          v.immagine_percorso,
                          COALESCE(p.nome, v.nome) AS progetto_nome,
-                         p.percorso               AS percorso_progetto
+                         p.percorso               AS percorso_progetto,
+                         v.ordine_id
                   FROM venduti v
                            LEFT JOIN negozio n ON v.negozio_id = n.id
                            LEFT JOIN progetti p ON n.progetto_id = p.id
+                           LEFT JOIN ordini o ON v.ordine_id = o.id
                   ORDER BY v.data_vendita DESC
                   """)
+
         righe = c.fetchall()
-        conn.close()
+        print(f"\nTotale vendite trovate: {len(righe)}")
 
         risultati = []
         for r in righe:
+            print(f"\n--- Vendita ID: {r['id']} ---")
+            print(f"  ordine_id: {r['ordine_id']}")
+            print(f"  prezzo_vendita (da venduti): {r['prezzo_vendita']}")
+            print(f"  prezzo_ordine (da ordini): {r['prezzo_ordine']}")
+            print(f"  prezzo_totale (calcolato): {r['prezzo_totale']}")
+
             risultati.append({
                 "id": r["id"],
                 "data": r["data"],
@@ -138,12 +82,109 @@ class VendutiManager:
                 "percorso_progetto": r["percorso_progetto"]
             })
 
+        conn.close()
+        print("=" * 60)
+        return risultati
+
+    @staticmethod
+    def get_ordini_aggregati() -> List[Dict]:
+        """
+        Recupera tutti gli ordini completati e li raggruppa per cliente.
+        Legge direttamente dalla tabella ordini.
+        """
+        print("\n" + "=" * 60)
+        print("🔍 DEBUG - get_ordini_aggregati()")
+        print("=" * 60)
+
+        conn = get_connection()
+        conn.row_factory = sqlite3.Row
+        c = conn.cursor()
+
+        # Query che legge direttamente da ordini
+        c.execute("""
+                  SELECT o.cliente,
+                         o.id                       AS ordine_id,
+                         o.prezzo_totale,
+                         o.data_inserimento,
+                         o.consegnato,
+                         GROUP_CONCAT(p.nome, ', ') AS progetti,
+                         SUM(po.quantita)           AS quantita_totale
+                  FROM ordini o
+                           LEFT JOIN progetti_ordinati po ON o.id = po.ordine_id
+                           LEFT JOIN progetti p ON po.progetto_id = p.id
+                  WHERE o.consegnato = 1 -- Solo ordini consegnati
+                  GROUP BY o.id
+                  ORDER BY o.cliente COLLATE NOCASE, o.data_inserimento DESC
+                  """)
+
+        righe = c.fetchall()
+        print(f"Totale ordini consegnati: {len(righe)}")
+
+        # Raggruppa per cliente in Python
+        clienti = {}
+        for r in righe:
+            cliente = r["cliente"] or "Cliente non specificato"
+            ordine_id = r["ordine_id"]
+            prezzo = r["prezzo_totale"] or 0
+            progetti = r["progetti"] or "-"
+            quantita = r["quantita_totale"] or 0
+            data = r["data_inserimento"]
+
+            if cliente not in clienti:
+                clienti[cliente] = {
+                    "items": [],
+                    "quantita_tot": 0,
+                    "totale": 0.0,
+                    "ultima_data": data,
+                    "ordini": []
+                }
+
+            clienti[cliente]["items"].append({
+                "ordine_id": ordine_id,
+                "progetti": progetti,
+                "quantita": quantita,
+                "prezzo": prezzo
+            })
+
+            clienti[cliente]["quantita_tot"] += quantita
+            clienti[cliente]["totale"] += prezzo
+            clienti[cliente]["ordini"].append(ordine_id)
+
+            if data and (not clienti[cliente]["ultima_data"] or data > clienti[cliente]["ultima_data"]):
+                clienti[cliente]["ultima_data"] = data
+
+        # Trasforma in lista ordinata
+        risultati = []
+        for cliente, info in sorted(clienti.items(), key=lambda t: t[0].lower()):
+            # Formatta gli items per la visualizzazione
+            items_str = ", ".join([f"Ordine #{o['ordine_id']}: {o['progetti']} (x{o['quantita']})"
+                                   for o in info["items"]])
+
+            risultati.append({
+                "cliente": cliente,
+                "items_str": items_str,
+                "items_list": info["items"],
+                "quantita_totale": info["quantita_tot"],
+                "totale": info["totale"],
+                "ultima_data": info["ultima_data"],
+                "numero_ordini": len(info["ordini"])
+            })
+
+        print("\n🔍 RIEPILOGO ORDINI AGGREGATI:")
+        for i, r in enumerate(risultati[:3]):
+            print(f"   Cliente {i + 1}: {r['cliente']}")
+            print(f"      Totale: {r['totale']}")
+            print(f"      Quantità totale: {r['quantita_totale']}")
+            print(f"      Numero ordini: {r['numero_ordini']}")
+
+        print("=" * 60)
         return risultati
 
     @staticmethod
     def get_vendite_cliente(cliente_nome: str) -> List[Dict]:
         """
         Recupera tutte le vendite di un cliente specifico.
+        Il prezzo totale viene preso dalla tabella ordini se disponibile.
         """
         conn = get_connection()
         conn.row_factory = sqlite3.Row
@@ -155,21 +196,25 @@ class VendutiManager:
                          v.nome AS v_nome,
                          p.nome AS p_nome,
                          CASE
-                             -- PRIMA controlla v.nome (che è corretto)
-                             WHEN v.nome IS NOT NULL AND v.nome != '' AND v.nome != 'ORDINI CLIENTI' AND v.nome != '🔹 ORDINI CLIENTI' THEN v.nome
-                    -- POI come fallback p.nome
-                    WHEN p.nome IS NOT NULL AND p.nome != '' AND p.nome != 'ORDINI CLIENTI' AND p.nome != '🔹 ORDINI CLIENTI' THEN p.nome
-                    ELSE 'Progetto sconosciuto'
-                  END
-                  AS progetto,
-                v.quantita,
-                v.prezzo_unitario,
-                v.prezzo_totale
-            FROM venduti v
-            LEFT JOIN negozio n ON v.negozio_id = n.id
-            LEFT JOIN progetti p ON n.progetto_id = p.id
-            WHERE v.cliente = ?
-            ORDER BY v.data_vendita DESC
+                             WHEN v.nome IS NOT NULL AND v.nome != '' AND v.nome != 'ORDINI CLIENTI' AND v.nome != '🔹 ORDINI CLIENTI' 
+                             THEN v.nome
+                             WHEN p.nome IS NOT NULL AND p.nome != '' AND p.nome != 'ORDINI CLIENTI' AND p.nome != '🔹 ORDINI CLIENTI' 
+                             THEN p.nome
+                             ELSE 'Progetto sconosciuto'
+                         END AS progetto,
+                         v.quantita,
+                         v.prezzo_unitario,
+                         -- 🔥 PREZZO TOTALE: se c'è ordine, prendi il valore originale dell'ordine
+                         CASE 
+                             WHEN o.id IS NOT NULL THEN o.prezzo_totale
+                             ELSE v.prezzo_totale
+                         END AS prezzo_totale
+                  FROM venduti v
+                  LEFT JOIN negozio n ON v.negozio_id = n.id
+                  LEFT JOIN progetti p ON n.progetto_id = p.id
+                  LEFT JOIN ordini o ON v.ordine_id = o.id
+                  WHERE v.cliente = ?
+                  ORDER BY v.data_vendita DESC
                   """, (cliente_nome,))
 
         righe = c.fetchall()
@@ -192,6 +237,7 @@ class VendutiManager:
     def get_dettaglio_vendita(vendita_id: int) -> Optional[Dict]:
         """
         Recupera i dettagli di una singola vendita.
+        Il prezzo totale viene preso dalla tabella ordini se disponibile.
         """
         conn = get_connection()
         conn.row_factory = sqlite3.Row
@@ -202,7 +248,11 @@ class VendutiManager:
                          v.data_vendita,
                          v.cliente,
                          v.quantita,
-                         v.prezzo_totale,
+                         -- 🔥 PREZZO TOTALE: se c'è ordine, prendi il valore originale dell'ordine
+                         CASE 
+                             WHEN o.id IS NOT NULL THEN o.prezzo_totale
+                             ELSE v.prezzo_totale
+                         END AS prezzo_totale,
                          v.prezzo_unitario,
                          v.costo_totale,
                          v.ricavo,
@@ -211,10 +261,12 @@ class VendutiManager:
                          COALESCE(p.nome, v.nome) AS nome,
                          p.percorso               AS percorso_progetto
                   FROM venduti v
-                           LEFT JOIN negozio n ON v.negozio_id = n.id
-                           LEFT JOIN progetti p ON n.progetto_id = p.id
+                  LEFT JOIN negozio n ON v.negozio_id = n.id
+                  LEFT JOIN progetti p ON n.progetto_id = p.id
+                  LEFT JOIN ordini o ON v.ordine_id = o.id
                   WHERE v.id = ?
                   """, (vendita_id,))
+
         row = c.fetchone()
         conn.close()
 
@@ -235,6 +287,17 @@ class VendutiManager:
             "progetto_nome": row["nome"],
             "percorso_progetto": row["percorso_progetto"]
         }
+
+    @staticmethod
+    def format_items_string(items: List[Dict]) -> str:
+        """
+        Formatta la lista degli items per la visualizzazione aggregata.
+        Esempio: "Lampada Cuore (2x25.00€), Quadro Luna (1x30.00€)"
+        """
+        items_list = []
+        for item in items:
+            items_list.append(f"{item['progetto']} ({item['quantita']}x{item['prezzo_unitario']:.2f}€)")
+        return ", ".join(items_list)
 
     @staticmethod
     def elimina_vendita(vendita_id: int) -> bool:
@@ -290,56 +353,5 @@ class VendutiManager:
         except Exception as e:
             conn.rollback()
             raise Exception(f"Errore durante l'aggiornamento: {e}")
-        finally:
-            conn.close()
-
-    @staticmethod
-    def format_items_string(items: List[Dict]) -> str:
-        """
-        Formatta la lista degli items per la visualizzazione aggregata.
-        Esempio: "Lampada Cuore (2x25.00€), Quadro Luna (1x30.00€)"
-        """
-        items_list = []
-        for item in items:
-            items_list.append(f"{item['progetto']} ({item['quantita']}x{item['prezzo_unitario']:.2f}€)")
-        return ", ".join(items_list)
-
-    @staticmethod
-    def registra_vendita(progetto_id: int,
-                         cliente: str,
-                         quantita: int,
-                         prezzo_totale: float,
-                         prezzo_unitario: float,
-                         note: str = "",
-                         nome_progetto: Optional[str] = None,
-                         immagine_percorso: Optional[str] = None) -> int:
-        """
-        Inserisce una nuova vendita direttamente nella tabella 'venduti'.
-        Restituisce l'ID della vendita appena creata.
-        """
-        conn = get_connection()
-        c = conn.cursor()
-        try:
-            data_vendita = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            c.execute("""
-                      INSERT INTO venduti (negozio_id, cliente, quantita, prezzo_totale, prezzo_unitario, note, nome,
-                                           immagine_percorso, data_vendita)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                      """, (
-                          progetto_id,  # negozio_id, ma in questo caso lo usi per identificare il progetto
-                          cliente,
-                          quantita,
-                          prezzo_totale,
-                          prezzo_unitario,
-                          note,
-                          nome_progetto,
-                          immagine_percorso,
-                          data_vendita
-                      ))
-            conn.commit()
-            return c.lastrowid
-        except Exception as e:
-            conn.rollback()
-            raise Exception(f"Errore durante l'inserimento della vendita: {e}")
         finally:
             conn.close()

@@ -112,6 +112,7 @@ class TabOrdini(tk.Frame):
             ("🧩 Componenti Mancanti", lambda: apri_componenti_mancanti(self), btn_opts),
             ("✅ Stato Consegna", self.marca_come_consegnato, btn_opts),
             ("🔄 Aggiorna Progetti", self.carica_progetti, btn_opts),
+            ("🔄 Aggiorna Tabella", self.aggiorna_tabella, btn_opts),
         ]
 
         for testo, comando, opts in pulsanti:
@@ -148,8 +149,8 @@ class TabOrdini(tk.Frame):
         scrollbar_y = ttk.Scrollbar(frame_ordini, orient="vertical")
         scrollbar_y.pack(side="right", fill="y")
 
-        # Treeview
-        colonne = ("id", "cliente", "data_inserimento", "data_consegna", "countdown", "stato")
+        # 🔥 DEFINISCI UNA SOLA VOLTA LE COLONNE (con pagamento)
+        colonne = ("id", "cliente", "data_inserimento", "data_consegna", "countdown", "stato", "pagamento")
         self.tree = ttk.Treeview(
             frame_ordini, columns=colonne, show="headings",
             yscrollcommand=scrollbar_y.set
@@ -163,7 +164,8 @@ class TabOrdini(tk.Frame):
             "data_inserimento": "Data Inserimento",
             "data_consegna": "Data Consegna",
             "countdown": "Giorni Mancanti",
-            "stato": "Consegnato"
+            "stato": "Consegnato",
+            "pagamento": "Stato Pagamento"
         }
 
         larghezze = {
@@ -172,7 +174,8 @@ class TabOrdini(tk.Frame):
             "data_inserimento": 110,
             "data_consegna": 110,
             "countdown": 100,
-            "stato": 80
+            "stato": 80,
+            "pagamento": 200  # 🔥 Aumentato per testo più lungo
         }
 
         for col, testo in intestazioni.items():
@@ -210,6 +213,13 @@ class TabOrdini(tk.Frame):
     # CARICAMENTO DATI
     # =========================================================================
 
+    def aggiorna_tabella(self):
+        """Aggiorna sia i progetti che gli ordini."""
+        print("🔄 Aggiornamento tabella ordini...")
+        self.carica_progetti()  # Aggiorna la lista progetti
+        self.carica_ordini()  # Aggiorna la tabella ordini
+        #mostra_info("Aggiornamento", "Tabella aggiornata con successo!", parent=self)
+
     def carica_progetti(self):
         """Carica la lista dei progetti (solo quelli in vendita) nella Listbox."""
         self.lista_progetti.delete(0, tk.END)
@@ -242,6 +252,13 @@ class TabOrdini(tk.Frame):
             # Stato consegna
             stato = "✔️" if ordine["consegnato"] else "❌"
 
+            # 🔥 STATO PAGAMENTO
+            stato_pagamento = ordine.get("stato_pagamento", "DA PAGARE")
+
+            # Se l'ordine è consegnato ma non c'è stato pagamento, mostra "DA PAGARE"
+            if ordine["consegnato"] and stato_pagamento == "DA PAGARE":
+                stato_pagamento = "DA PAGARE (consegnato)"
+
             # Determina tag per righe alternate
             tag = "evenrow" if i % 2 == 0 else "oddrow"
 
@@ -253,7 +270,8 @@ class TabOrdini(tk.Frame):
                     data_ins,
                     data_cons,
                     giorni_mancanti,
-                    stato
+                    stato,
+                    stato_pagamento  # 🔥 NUOVA COLONNA
                 ),
                 tags=(tag,)
             )
@@ -617,10 +635,18 @@ class TabOrdini(tk.Frame):
 
         progetti = OrdineManager.get_progetti_ordinati(ordine_id)
 
+        print(f"\n🔍 DETTAGLIO ORDINE #{ordine_id}")
+        print(f"   Totale ordine dal DB: {ordine.get('prezzo_totale')}")
+        print(f"   Progetti trovati: {len(progetti)}")
+        for p in progetti:
+            print(f"   - {p['nome']}: qta {p['quantita']}, "
+                  f"prezzo_unitario {p.get('prezzo_unitario')}, "
+                  f"prezzo_totale {p.get('prezzo_totale')}")
+
         # Crea popup
         popup = tk.Toplevel(self)
-        popup.title(f"Dettaglio Ordine #{ordine_id}")
-        popup.geometry("650x550")
+        popup.title(f"Dettaglio Ordine - Cliente: {ordine['cliente']}")
+        popup.geometry("650x700")
         popup.configure(bg="#f7f1e1")
         popup.transient(self)
         popup.update_idletasks()
@@ -648,7 +674,7 @@ class TabOrdini(tk.Frame):
         row = 0
 
         # Intestazione
-        tk.Label(scroll_frame, text=f"DETTAGLIO ORDINE #{ordine_id}",
+        tk.Label(scroll_frame, text=f"DETTAGLIO ORDINE ID:{ordine_id} - {ordine['cliente']}",
                  font=("Segoe UI", 14, "bold"), bg="#f7f1e1", fg="#5a3e1b").grid(
             row=row, column=0, columnspan=2, pady=(0, 15))
         row += 1
@@ -684,7 +710,7 @@ class TabOrdini(tk.Frame):
                  font=("Segoe UI", 10)).grid(row=row, column=1, sticky="w", padx=5)
         row += 1
 
-        # 🔥 NUOVO: Prezzi e acconto (se presenti)
+        # Prezzi e acconto (se presenti)
         if "prezzo_totale" in ordine and ordine["prezzo_totale"]:
             tk.Label(scroll_frame, text="Totale Ordine:", font=("Segoe UI", 10, "bold"),
                      bg="#f7f1e1").grid(row=row, column=0, sticky="w", pady=5, padx=5)
@@ -753,14 +779,10 @@ class TabOrdini(tk.Frame):
         tree_progetti.pack(side="left", fill="both", expand=True)
         scrollbar_tree.pack(side="right", fill="y")
 
+        # 🔥 INSERIMENTO PROGETTI (UNA SOLA VOLTA)
         for p in progetti:
-            # Verifica se ci sono prezzi
-            if "prezzo_unitario" in p and p["prezzo_unitario"]:
-                prezzo_u = f"€ {p['prezzo_unitario']:.2f}"
-                prezzo_t = f"€ {p['prezzo_totale']:.2f}"
-            else:
-                prezzo_u = "N/D"
-                prezzo_t = "N/D"
+            prezzo_u = f"€ {p['prezzo_unitario']:.2f}" if p.get('prezzo_unitario') else "N/D"
+            prezzo_t = f"€ {p['prezzo_totale']:.2f}" if p.get('prezzo_totale') else "N/D"
 
             tree_progetti.insert("", tk.END, values=(
                 p["nome"],
@@ -768,6 +790,9 @@ class TabOrdini(tk.Frame):
                 prezzo_u,
                 prezzo_t
             ))
+
+            print(f"   Inserito in treeview: {p['nome']} - {prezzo_u} - {prezzo_t}")
+
         row += 1
 
         # Pulsanti
