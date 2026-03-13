@@ -20,6 +20,7 @@
 - Non spostare l'EXE fuori dalla cartella
 - La cartella icons deve stare nella stessa posizione dell'EXE
 - I dati vengono salvati nella cartella database
+- Per resettare il database di prova nella cartella 'database' è sufficiente cancellarlo. Verrà automaticamente ricreato da 0 al primo riavvio
 
 ❓ **PROBLEMI?**
 - Se non si avvia, controlla che la cartella "icons" sia presente
