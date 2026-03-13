@@ -19,6 +19,7 @@ database/backup_*.db
 # Configurazioni locali
 config.json
 creaEXE.txt
+main_mio.py
 
 # Cartelle di export e backup
 export/
