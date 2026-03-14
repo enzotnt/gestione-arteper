@@ -1,10 +1,21 @@
 # Manuale Utente - Gestione arTEper
 
+
+
 ## ☕ Supporta il progetto
 
-Se il gestionale ti è utile e vuoi sostenere lo sviluppo, puoi fare una donazione:
+Questo gestionale è sviluppato nel tempo libero e distribuito gratuitamente. Se ti è utile e vuoi contribuire al suo sviluppo, puoi:
+Fare una donazione per sostenere lo sviluppo
+
 
 [![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=CZ4FPWPBDJ6KQ)
+
+### ⭐ Altri modi per aiutare
+- Metti una **stella** ⭐ sul repository
+- Segnala **bug** o proponi **miglioramenti**
+- Condividi il progetto con chi potrebbe trovarlo utile
+
+Grazie a tutti coloro che supportano il software libero! 🙏
 
 ## 📥 Download
 
