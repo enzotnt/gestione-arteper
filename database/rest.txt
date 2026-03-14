@@ -1,0 +1,2 @@
+per resettare il db, cancellare 'gestione.db' se non è presente il file 'gestione.db' in questa cartella,
+ne viene creato uno nuovo al primo riavvio
