@@ -1,5 +1,11 @@
 # Manuale Utente - Gestione arTEper
 
+## ☕ Supporta il progetto
+
+Se il gestionale ti è utile e vuoi sostenere lo sviluppo, puoi fare una donazione:
+
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://www.paypal.com/donate/?hosted_button_id=CZ4FPWPBDJ6KQ)
+
 ## 📥 Download
 
 ### 🏁 Windows (senza Python)
