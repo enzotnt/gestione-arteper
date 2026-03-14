@@ -13,7 +13,7 @@ __pycache__/
 *.egg-info/
 
 # Database locale
-database/*.db
+
 
 # Configurazioni locali
 config.json
