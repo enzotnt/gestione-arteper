@@ -542,12 +542,12 @@ class DettaglioOrdineWindow(tk.Toplevel):
                         # Ottieni l'ID appena inserito
                         negozio_id = cur.lastrowid
 
-                    # 🔥 PASSO 2: REGISTRA IN VENDUTI
+                    # 🔥 PASSO 2: REGISTRA IN VENDUTI (CON ORDINE_ID)
                     data_vendita = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     cur.execute("""
                                 INSERT INTO venduti (negozio_id, cliente, quantita, prezzo_totale,
-                                                     prezzo_unitario, note, nome, data_vendita)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                                     prezzo_unitario, note, nome, data_vendita, ordine_id)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                                 """, (negozio_id,
                                       risultato["cliente"],
                                       item["quantita"],
@@ -555,13 +555,15 @@ class DettaglioOrdineWindow(tk.Toplevel):
                                       prezzo_unitario_scontato,
                                       f"Da ordine #{risultato['ordine_id']}",
                                       item["nome_visibile"],
-                                      data_vendita))
+                                      data_vendita,
+                                      risultato["ordine_id"]))  # 🔥 ORDINE_ID SALVATO!
 
                     vendita_id = cur.lastrowid
                     if vendita_id:
                         vendita_ids.append(vendita_id)
 
-                    print(f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id})")
+                    print(
+                        f"   ✅ Inserito vendita per {item['nome_visibile']} (ID: {vendita_id}, ordine_id: {risultato['ordine_id']})")
 
                 # 🔥 PASSO 3: SEGNA ORDINE COME CONSEGNATO E AGGIORNA STATO PAGAMENTO
                 data_ora = datetime.now().strftime("%d/%m/%Y %H:%M")

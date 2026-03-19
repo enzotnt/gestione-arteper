@@ -22,6 +22,8 @@ from utils.gui_utils import (
     chiedi_modifica_testo
 )
 
+from db.database import get_connection
+
 from logic.mercatini import aggiungi_progetti_a_mercatino
 
 
@@ -482,31 +484,43 @@ class TabNegozio(tk.Frame):
         """Mostra il dialog per la vendita multipla."""
 
         class SellDialog(tk.Toplevel):
-            def __init__(self, parent, items, titolo="Vendita multipla"):
+            def __init__(self, parent, items, titolo="Vendita multipla", acconto=0):
                 super().__init__(parent)
                 self.parent = parent
                 self.items = [dict(it) for it in items]
-                self.cliente = cliente
+                self.cliente = None
+                self.acconto = acconto
                 self.result = None
                 self.buono_applicato = None
                 self.title(titolo)
                 self.configure(bg="#f7f1e1")
-                self.geometry("920x600")  # Solo aumentato leggermente l'altezza
+                self.geometry("920x650")  # Aumentata per l'acconto
                 self.transient(parent)
                 self.grab_set()
 
-                self._crea_interfaccia(cliente)
+                self._crea_interfaccia()
                 self._centra_finestra()
 
-            def _crea_interfaccia(self, cliente):
+            def _crea_interfaccia(self):
                 """Crea l'interfaccia del dialog."""
                 # Intestazione cliente
-                tk.Label(self, text=f"Cliente: {cliente}", bg="#f7f1e1",
+                tk.Label(self, text=f"Cliente: {self.cliente}", bg="#f7f1e1",
                          font=("Segoe UI", 10, "bold")).pack(pady=(8, 2))
 
-                # 🔥 Frame per il codice sconto
+                # Info acconto se presente
+                if self.acconto > 0:
+                    frame_acconto = tk.Frame(self, bg="#f7f1e1")
+                    frame_acconto.pack(fill="x", padx=10, pady=5)
+
+                    tk.Label(frame_acconto, text=f"Acconto già versato: € {self.acconto:.2f}",
+                             bg="#f7f1e1", font=("Segoe UI", 10, "bold"), fg="green").pack(side="left")
+
+                    tk.Label(frame_acconto, text="(verrà detratto dal totale)",
+                             bg="#f7f1e1", font=("Segoe UI", 9, "italic"), fg="gray").pack(side="left", padx=10)
+
+                # Frame per il codice sconto
                 frame_sconto = tk.Frame(self, bg="#f7f1e1")
-                frame_sconto.pack(fill="x", padx=10, pady=(0, 5))
+                frame_sconto.pack(fill="x", padx=10, pady=5)
 
                 tk.Label(frame_sconto, text="Codice sconto:", bg="#f7f1e1",
                          font=("Segoe UI", 9)).pack(side="left", padx=(0, 5))
@@ -522,7 +536,7 @@ class TabNegozio(tk.Frame):
                                          bg="#e0e0e0")
                 btn_verifica.pack(side="left", padx=5)
 
-                # 🔥 Label per mostrare lo stato del codice sconto (AGGIUNTA)
+                # Label per mostrare lo stato del codice sconto
                 self.label_sconto = tk.Label(frame_sconto, text="", bg="#f7f1e1",
                                              font=("Segoe UI", 9, "italic"))
                 self.label_sconto.pack(side="left", padx=10)
@@ -566,13 +580,13 @@ class TabNegozio(tk.Frame):
                 if not valido:
                     messagebox.showerror("Codice non valido", msg, parent=self)
                     self.label_sconto.config(text=msg, fg="red")
-                    self.codice_sconto_var.set("")  # Pulisci il campo
+                    self.codice_sconto_var.set("")
                     if hasattr(self, 'buono_applicato'):
                         delattr(self, 'buono_applicato')
                     self._aggiorna_totali()
                     return
 
-                # Salva i dati del buono per usarli dopo
+                # Salva i dati del buono
                 self.buono_applicato = {
                     'id': buono['id'],
                     'codice': buono['codice'],
@@ -688,7 +702,7 @@ class TabNegozio(tk.Frame):
                 })
 
             def _crea_pulsanti_dialog(self):
-                """Crea i pulsanti in fondo al dialog con visualizzazione sconto."""
+                """Crea i pulsanti in fondo al dialog."""
                 bottom = tk.Frame(self, bg="#f7f1e1")
                 bottom.pack(fill="x", padx=10, pady=8)
 
@@ -703,6 +717,14 @@ class TabNegozio(tk.Frame):
                 tk.Label(frame_totali, textvariable=self.totale_lordo_var,
                          bg="#f7f1e1", font=("Segoe UI", 9, "bold")).pack(side="left", padx=5)
 
+                # Acconto (se presente)
+                if self.acconto > 0:
+                    tk.Label(frame_totali, text="Acconto: €", bg="#f7f1e1",
+                             font=("Segoe UI", 9)).pack(side="left", padx=(20, 5))
+                    self.acconto_var = tk.DoubleVar(value=self.acconto)
+                    tk.Label(frame_totali, textvariable=self.acconto_var,
+                             bg="#f7f1e1", font=("Segoe UI", 9, "bold"), fg="green").pack(side="left", padx=5)
+
                 # Sconto
                 tk.Label(frame_totali, text="Sconto: €", bg="#f7f1e1",
                          font=("Segoe UI", 9)).pack(side="left", padx=(20, 5))
@@ -710,12 +732,12 @@ class TabNegozio(tk.Frame):
                 tk.Label(frame_totali, textvariable=self.sconto_var,
                          bg="#f7f1e1", font=("Segoe UI", 9, "bold"), fg="red").pack(side="left", padx=5)
 
-                # Totale netto (modificabile)
-                tk.Label(frame_totali, text="Totale netto: €", bg="#f7f1e1",
+                # Totale da pagare
+                tk.Label(frame_totali, text="Totale da pagare: €", bg="#f7f1e1",
                          font=("Segoe UI", 10, "bold")).pack(side="left", padx=(20, 5))
-                self.totale_var = tk.DoubleVar(value=self._calcola_totale())
-                tk.Entry(frame_totali, textvariable=self.totale_var, width=12,
-                         justify="center", font=("Segoe UI", 10, "bold")).pack(side="left", padx=5)
+                self.totale_netto_var = tk.DoubleVar(value=self._calcola_totale() - self.acconto)
+                tk.Label(frame_totali, textvariable=self.totale_netto_var,
+                         bg="#f7f1e1", font=("Segoe UI", 10, "bold"), fg="#3366cc").pack(side="left", padx=5)
 
                 # Pulsanti
                 frame_btn = tk.Frame(bottom, bg="#f7f1e1")
@@ -739,7 +761,8 @@ class TabNegozio(tk.Frame):
                 totale_lordo = self._calcola_totale()
                 self.totale_lordo_var.set(totale_lordo)
 
-                # Se c'è un buono applicato, ricalcola lo sconto
+                # Calcola sconto se c'è un buono applicato
+                sconto = 0.0
                 if hasattr(self, 'buono_applicato') and self.buono_applicato:
                     if self.buono_applicato['tipo'] == 'REGALO':
                         sconto = min(self.buono_applicato['valore_residuo'], totale_lordo)
@@ -747,11 +770,14 @@ class TabNegozio(tk.Frame):
                         percentuale = self.buono_applicato['valore_originale']
                         sconto = totale_lordo * (percentuale / 100)
 
-                    self.sconto_var.set(round(sconto, 2))
-                    self.totale_var.set(round(totale_lordo - sconto, 2))
-                else:
-                    self.sconto_var.set(0.0)
-                    self.totale_var.set(totale_lordo)
+                self.sconto_var.set(round(sconto, 2))
+
+                # Totale dopo sconto
+                totale_con_sconto = totale_lordo - sconto
+
+                # Detrai acconto
+                totale_netto = totale_con_sconto - self.acconto
+                self.totale_netto_var.set(max(0, round(totale_netto, 2)))
 
             def _calcola_totale(self):
                 """Calcola il totale corrente."""
@@ -804,21 +830,20 @@ class TabNegozio(tk.Frame):
                     })
 
                 self.result = {
-                    "cliente": self.cliente,  # Assicurati che self.cliente sia definito
+                    "cliente": self.cliente,
                     "codice_sconto": self.codice_sconto_var.get().strip(),
                     "buono_applicato": getattr(self, 'buono_applicato', None),
                     "righe": risultati,
                     "totale_lordo": float(self.totale_lordo_var.get() or 0.0),
-                    "sconto": float(self.sconto_var.get() or 0.0),  # <-- IMPORTANTE
-                    "totale_finale": float(self.totale_var.get() or 0.0)
+                    "sconto": float(self.sconto_var.get() or 0.0),
+                    "acconto": self.acconto,
+                    "totale_finale": float(self.totale_netto_var.get() or 0.0)
                 }
                 self.grab_release()
                 self.destroy()
 
             def on_cancel(self):
-                """Annulla la vendita."""
                 self.result = None
-                self.grab_release()
                 self.destroy()
 
         dlg = SellDialog(self, items, titolo=f"Vendita multipla - Cliente: {cliente}")
@@ -826,7 +851,7 @@ class TabNegozio(tk.Frame):
         return getattr(dlg, "result", None)
 
     def _processa_vendita(self, risultato, cliente):
-        """Processa i risultati del dialog di vendita."""
+        """Processa i risultati del dialog di vendita (COME NEL TAB LAVORAZIONE)."""
         vendite = risultato["righe"]
         totale_finale = risultato["totale_finale"]
         codice_sconto = risultato.get("codice_sconto", None)
@@ -837,30 +862,21 @@ class TabNegozio(tk.Frame):
         totale_vendita = sum(v["prezzo_totale"] for v in vendite)
         proporzione = (totale_finale / totale_vendita) if totale_vendita else 1.0
 
-        for v in vendite:
-            v["prezzo_totale"] = round(v["prezzo_totale"] * proporzione, 2)
-            v["prezzo_unitario"] = round(v["prezzo_unitario"] * proporzione, 4)
-
-        # Genera nota riepilogativa
-        nota_ordine = self._genera_note_ordine(vendite, cliente)
-
-        if codice_sconto:
-            nota_ordine = f"Codice sconto: {codice_sconto}\n{nota_ordine}"
-
-        # Variabili per gestire il buono dopo la transazione principale
-        buono_da_applicare = buono_applicato
-        sconto_da_applicare = sconto_applicato
+        vendita_ids = []
         vendita_ids_per_buono = []
 
-        # Salva su DB usando i manager
-        with db_cursor(commit=True, parent=self) as cur:
-            vendita_ids = []
+        # 🔥 USA UNA SOLA CONNESSIONE PER TUTTO (come nel tab lavorazione)
+        conn = get_connection()
+        cur = conn.cursor()
 
-            for vendita in vendite:
+        try:
+            for i, vendita in enumerate(vendite):
                 negozio_id = vendita["negozio_id"]
                 qta = vendita["quantita"]
-                prezzo_unit = vendita["prezzo_unitario"]
-                prezzo_tot = vendita["prezzo_totale"]
+
+                # 🔥 Calcola prezzi scontati (come nel tab lavorazione)
+                prezzo_totale_scontato = round(vendita["prezzo_totale"] * proporzione, 2)
+                prezzo_unitario_scontato = round(vendita["prezzo_unitario"] * proporzione, 4)
 
                 # Recupera progetto_id
                 cur.execute("SELECT progetto_id FROM negozio WHERE id=?", (negozio_id,))
@@ -869,35 +885,65 @@ class TabNegozio(tk.Frame):
                     continue
                 progetto_id = r[0]
 
-                # Registra vendita usando il manager
-                vendita_id = VenditaManager.registra_vendita(
-                    negozio_id, progetto_id, cliente, qta,
-                    prezzo_tot, prezzo_unit, nota_ordine, codice_sconto
-                )
+                # 🔥 REGISTRA IN VENDUTI con prezzo SCONTATO (come nel tab lavorazione)
+                data_vendita = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+                # Genera nota con info buono
+                note = self._genera_note_ordine([vendita], cliente)
+                if codice_sconto:
+                    note = f"Codice sconto: {codice_sconto}\n{note}"
+
+                cur.execute("""
+                            INSERT INTO venduti (negozio_id, cliente, quantita, prezzo_totale,
+                                                 prezzo_unitario, note, nome, data_vendita)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (negozio_id,
+                                  cliente,
+                                  qta,
+                                  prezzo_totale_scontato,
+                                  prezzo_unitario_scontato,
+                                  note,
+                                  vendita["nome_visibile"],
+                                  data_vendita))
+
+                vendita_id = cur.lastrowid
                 if vendita_id:
                     vendita_ids.append(vendita_id)
 
                 # Aggiorna quantità nel negozio
-                NegozioManager.aggiorna_quantita_negozio(negozio_id, qta)
+                cur.execute("UPDATE negozio SET disponibili = disponibili - ? WHERE id = ?",
+                            (qta, negozio_id))
 
-            # Salva gli ID vendite per applicare il buono dopo
-            vendita_ids_per_buono = vendita_ids
+            # 🔥 COMMIT FINALE
+            conn.commit()
+            print("   ✅ Transazione completata con successo")
 
-        # 🔥 APPLICA IL BUONO DOPO LA TRANSAZIONE PRINCIPALE
-        if buono_da_applicare and vendita_ids_per_buono and sconto_da_applicare > 0:
+        except Exception as e:
+            conn.rollback()
+            print(f"❌ Errore durante la transazione: {e}")
+            raise
+        finally:
+            conn.close()
+
+        # 🔥 APPLICA IL BUONO DOPO LA TRANSAZIONE PRINCIPALE (COME NEL TAB LAVORAZIONE)
+        if buono_applicato and vendita_ids and sconto_applicato > 0:
             from logic.buoni import BuonoManager
 
             success, msg = BuonoManager.applica_utilizzo(
-                buono_id=buono_da_applicare['id'],
-                importo_utilizzato=sconto_da_applicare,
-                vendita_id=vendita_ids_per_buono[0]  # Associa alla prima vendita
+                buono_id=buono_applicato['id'],
+                importo_utilizzato=sconto_applicato,
+                vendita_id=vendita_ids[0]  # Associa alla prima vendita
             )
 
-            if not success:
-                print(f"Errore nell'aggiornamento del buono: {msg}")
+            if success:
+                print(f"✅ Buono applicato: {msg}")
+            else:
+                print(f"❌ Errore nell'aggiornamento del buono: {msg}")
 
-        mostra_info("Vendita completata", f"Vendita a '{cliente}' registrata con successo.", parent=self)
+        mostra_info("Vendita completata",
+                    f"Vendita a '{cliente}' registrata con successo.\n"
+                    f"Totale pagato: € {totale_finale:.2f}",
+                    parent=self)
         self.carica_dati()
 
     def _genera_note_ordine(self, vendite, cliente):

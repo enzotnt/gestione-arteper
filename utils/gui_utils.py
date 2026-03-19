@@ -40,27 +40,46 @@ def crea_finestra_con_treeview(parent, titolo, colonne, dati, column_types=None)
 def ordina_colonna_treeview(tree, colonna, stato_ordinamento):
     """
     Ordina una Treeview per colonna con riconoscimento intelligente di numeri e date.
-
-    Args:
-        tree: la Treeview da ordinare
-        colonna: il nome della colonna cliccata
-        stato_ordinamento: dizionario con lo stato corrente
-            {
-                'colonna': colonna_corrente (o None),
-                'ascendente': True/False
-            }
-
-    Returns:
-        dict: nuovo stato dell'ordinamento
     """
-    # Raccogli i dati
-    dati = [(tree.set(k, colonna), k) for k in tree.get_children('')]
+    from datetime import datetime
 
-    # Funzione di conversione intelligente
-    def try_convert(val):
+    # Verifica che la colonna esista
+    try:
+        # Prova a ottenere un valore per vedere se la colonna esiste
+        test = tree.get_children('')
+        if test:
+            tree.set(test[0], colonna)
+    except:
+        print(f"⚠️ Colonna '{colonna}' non trovata, uso fallback")
+        # Se la colonna non esiste, prova a usare l'indice
+        colonne = tree['columns']
+        if colonna in colonne:
+            indice = colonne.index(colonna)
+            # Raccogli i dati usando l'indice
+            dati = []
+            for k in tree.get_children(''):
+                valori = tree.item(k, 'values')
+                if indice < len(valori):
+                    dati.append((valori[indice], k))
+                else:
+                    dati.append(("", k))
+        else:
+            # Se proprio non funziona, esci senza fare nulla
+            print(f"❌ Colonna '{colonna}' non gestibile")
+            return stato_ordinamento
+    else:
+        # Raccogli i dati normalmente
+        dati = [(tree.set(k, colonna), k) for k in tree.get_children('')]
+
+    # Funzione di conversione intelligente con priorità
+    def get_sort_key(val):
+        """Restituisce una tupla (tipo, valore) per l'ordinamento"""
+        val_str = str(val).strip()
+
         # Prova a convertire in float (rimuovendo simboli € e formattazione)
         try:
-            return float(val.replace(" €", "").replace(",", ".").replace("€", "").strip())
+            val_float = float(val_str.replace(" €", "").replace("€", "").replace(",", ".").strip())
+            return (0, val_float)  # I numeri hanno priorità 0
         except:
             pass
 
@@ -68,17 +87,21 @@ def ordina_colonna_treeview(tree, colonna, stato_ordinamento):
         try:
             for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d %H:%M:%S"):
                 try:
-                    return datetime.strptime(val, fmt)
+                    val_date = datetime.strptime(val_str, fmt)
+                    return (1, val_date)  # Le date hanno priorità 1
                 except:
                     continue
         except:
             pass
 
-        # Altrimenti restituisci stringa in minuscolo
-        return val.lower()
+        # Altrimenti stringa (priorità 2)
+        return (2, val_str.lower())
 
-    # Converti i valori
-    dati = [(try_convert(v), k) for v, k in dati]
+    # Prepara i dati con le chiavi di ordinamento
+    dati_con_chiavi = []
+    for v, k in dati:
+        chiave = get_sort_key(v)
+        dati_con_chiavi.append((chiave, k))
 
     # Gestisci direzione ordinamento
     if stato_ordinamento['colonna'] == colonna:
@@ -88,10 +111,10 @@ def ordina_colonna_treeview(tree, colonna, stato_ordinamento):
         stato_ordinamento['colonna'] = colonna
 
     # Ordina
-    dati.sort(reverse=not stato_ordinamento['ascendente'])
+    dati_con_chiavi.sort(key=lambda x: x[0], reverse=not stato_ordinamento['ascendente'])
 
     # Riordina le righe nella Treeview
-    for index, (val, k) in enumerate(dati):
+    for index, (chiave, k) in enumerate(dati_con_chiavi):
         tree.move(k, '', index)
 
     return stato_ordinamento

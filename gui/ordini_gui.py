@@ -16,18 +16,52 @@ from utils.helpers import (
 from utils.componenti_mancanti_util import apri_componenti_mancanti
 from utils.magazzino_util import on_doppio_click
 
+from functools import partial  # Aggiungi in cima al file, con gli altri import
+
 
 class TabOrdini(tk.Frame):
     def __init__(self, parent):
         super().__init__(parent, bg="#f7f1e1")
         self.pack(padx=10, pady=10, fill="both", expand=True)
 
-        self.ordina_colonna = None
+        # 🔥 VARIABILI - attenzione a non usare nomi di metodi
+        self.colonna_ordinamento = None  # Invece di ordina_colonna
         self.ordina_asc = True
         self.progetti = []
         self.percorso_salvataggio = Path.home() / "LAVORI"
 
         self.crea_widgets()
+
+    def ordina_colonna(self, col):  # 🔥 QUESTO È IL METODO (OK)
+        """Ordina la tabella per colonna."""
+        if not hasattr(self, 'tree') or not self.tree:
+            return
+
+        dati = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
+
+        # Tentativo di conversione per date
+        if col in ("data_inserimento", "data_consegna"):
+            try:
+                from datetime import datetime
+                dati = [(datetime.strptime(v, "%d/%m/%Y"), k) for v, k in dati if v != "N/D"]
+            except Exception:
+                pass
+        elif col == "countdown":
+            try:
+                dati = [(int(v.split()[0]) if v != "N/D" and v != "Scaduto" else 9999, k)
+                        for v, k in dati]
+            except Exception:
+                pass
+
+        dati.sort(reverse=not self.ordina_asc)
+
+        for index, (val, k) in enumerate(dati):
+            self.tree.move(k, "", index)
+
+        self.ordina_asc = not self.ordina_asc
+        self.colonna_ordinamento = col  # 🔥 Aggiorna la variabile col nuovo nome
+
+    # ... (tutto il resto del codice rimane identico) ...
 
     # =========================================================================
     # CREAZIONE INTERFACCIA
@@ -137,6 +171,8 @@ class TabOrdini(tk.Frame):
         self.btn_elimina.bind("<Enter>", lambda e: self.btn_elimina.configure(bg='#c9302c'))
         self.btn_elimina.bind("<Leave>", lambda e: self.btn_elimina.configure(bg='#d9534f'))
 
+    from functools import partial  # Aggiungi in cima al file, con gli altri import
+
     def _crea_sezione_ordini_esistenti(self):
         """Crea la sezione con la tabella degli ordini esistenti."""
         frame_ordini = tk.LabelFrame(
@@ -149,7 +185,7 @@ class TabOrdini(tk.Frame):
         scrollbar_y = ttk.Scrollbar(frame_ordini, orient="vertical")
         scrollbar_y.pack(side="right", fill="y")
 
-        # 🔥 DEFINISCI UNA SOLA VOLTA LE COLONNE (con pagamento)
+        # DEFINISCI LE COLONNE
         colonne = ("id", "cliente", "data_inserimento", "data_consegna", "countdown", "stato", "pagamento")
         self.tree = ttk.Treeview(
             frame_ordini, columns=colonne, show="headings",
@@ -175,13 +211,15 @@ class TabOrdini(tk.Frame):
             "data_consegna": 110,
             "countdown": 100,
             "stato": 80,
-            "pagamento": 200  # 🔥 Aumentato per testo più lungo
+            "pagamento": 200
         }
 
+        # 🔥 USA PARTIAL INVECE DI LAMBDA
         for col, testo in intestazioni.items():
             self.tree.heading(
-                col, text=testo,
-                command=lambda c=col: self.ordina_colonna(c)
+                col,
+                text=testo,
+                command=partial(self.ordina_colonna, col)  # partial è più sicuro
             )
             self.tree.column(col, width=larghezze[col], anchor="center")
 
@@ -313,33 +351,7 @@ class TabOrdini(tk.Frame):
     # ORDINAMENTO
     # =========================================================================
 
-    def ordina_colonna(self, col):
-        """Ordina la tabella per colonna."""
-        if not hasattr(self, 'tree') or not self.tree:
-            return
 
-        dati = [(self.tree.set(k, col), k) for k in self.tree.get_children("")]
-
-        # Tentativo di conversione per date
-        if col in ("data_inserimento", "data_consegna"):
-            try:
-                dati = [(datetime.strptime(v, "%d/%m/%Y"), k) for v, k in dati if v != "N/D"]
-            except Exception:
-                pass
-        elif col == "countdown":
-            try:
-                dati = [(int(v.split()[0]) if v != "N/D" and v != "Scaduto" else 9999, k)
-                        for v, k in dati]
-            except Exception:
-                pass
-
-        dati.sort(reverse=not self.ordina_asc)
-
-        for index, (val, k) in enumerate(dati):
-            self.tree.move(k, "", index)
-
-        self.ordina_asc = not self.ordina_asc
-        self.ordina_colonna = col
 
     # =========================================================================
     # AZIONI SUGLI ORDINI
